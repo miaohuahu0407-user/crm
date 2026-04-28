@@ -1,0 +1,125 @@
+{
+  "tableName": "商品规格映射表",
+  "records": [
+    {
+      "product_name": "冬季陈列试单包",
+      "style_code": "HG0120",
+      "plating_color": "白K",
+      "color_name": "冰晶白"
+    },
+    {
+      "product_name": "预售礼盒打样单",
+      "style_code": "HG0148",
+      "plating_color": "KC金",
+      "color_name": "酒红"
+    },
+    {
+      "product_name": "预售礼盒备用材质包",
+      "style_code": "HG0148",
+      "plating_color": "古金",
+      "color_name": "墨黑"
+    },
+    {
+      "product_name": "新品首发基础套组",
+      "style_code": "HG0206",
+      "plating_color": "KC金",
+      "color_name": "珍珠白"
+    },
+    {
+      "product_name": "母亲节赠品打样单",
+      "style_code": "HG0224",
+      "plating_color": "白K",
+      "color_name": "樱粉"
+    },
+    {
+      "product_name": "母亲节档期备货单",
+      "style_code": "HG0224",
+      "plating_color": "KC金",
+      "color_name": "樱粉"
+    },
+    {
+      "product_name": "老客补货复盘试单",
+      "style_code": "HG0286",
+      "plating_color": "枪黑",
+      "color_name": "曜石黑"
+    },
+    {
+      "product_name": "新品首发加购组合",
+      "style_code": "HG0350",
+      "plating_color": "KC金",
+      "color_name": "香槟金"
+    },
+    {
+      "product_name": "皇冠HG0182",
+      "style_code": "HG0182",
+      "plating_color": "KC金",
+      "color_name": "酒红"
+    },
+    {
+      "product_name": "A产品基础款",
+      "style_code": "HG0216",
+      "plating_color": "白K",
+      "color_name": "珍珠白"
+    },
+    {
+      "product_name": "高频复购补单",
+      "style_code": "HG0216",
+      "plating_color": "KC金",
+      "color_name": "象牙白"
+    },
+    {
+      "product_name": "周度复购小单",
+      "style_code": "HG0310",
+      "plating_color": "白K",
+      "color_name": "香槟金"
+    },
+    {
+      "product_name": "预售样板确认单",
+      "style_code": "HG0452",
+      "plating_color": "古金",
+      "color_name": "墨黑"
+    },
+    {
+      "product_name": "预售补样订单",
+      "style_code": "HG0452",
+      "plating_color": "古金",
+      "color_name": "酒红"
+    },
+    {
+      "product_name": "新品B样品包",
+      "style_code": "HG0388",
+      "plating_color": "KC金",
+      "color_name": "珍珠白"
+    },
+    {
+      "product_name": "项链XL8726",
+      "style_code": "HG0506",
+      "plating_color": "枪黑",
+      "color_name": "墨黑"
+    },
+    {
+      "product_name": "A产品组合补货",
+      "style_code": "HG0216",
+      "plating_color": "古金",
+      "color_name": "象牙白"
+    },
+    {
+      "product_name": "皇冠HG0278",
+      "style_code": "HG0278",
+      "plating_color": "KC金",
+      "color_name": "海军蓝"
+    },
+    {
+      "product_name": "皇冠HG0412",
+      "style_code": "HG0412",
+      "plating_color": "白K",
+      "color_name": "祖母绿"
+    },
+    {
+      "product_name": "皇冠HG0526",
+      "style_code": "HG0526",
+      "plating_color": "古金",
+      "color_name": "酒红"
+    }
+  ]
+}

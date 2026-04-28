@@ -23,7 +23,6 @@ import {
   LayoutDashboard,
   Menu,
   Package,
-  Plus,
   Search,
   Settings,
   ShoppingBag,
@@ -120,8 +119,6 @@ type DashboardTaskFormState = {
 };
 
 type DashboardProgressFormState = {
-  submittedBy: string;
-  progressPercent: string;
   status: TaskStatus;
   content: string;
 };
@@ -178,6 +175,9 @@ type DashboardCustomerRow = {
   highPriorityOpenTaskCount: number;
   riskTaskCount: number;
   inProgressTaskCount: number;
+  goalCurrentAmount: number;
+  goalTargetAmount: number;
+  goalProgressRate: number;
   attentionStatus: string;
 };
 
@@ -213,6 +213,11 @@ const TODAY = '2026-04-24';
 const DEFAULT_OWNER = '陈敏';
 const PAGE_TAGS = ['仪表盘', '客户驾驶舱', '客户列表', '客户360'];
 const DASHBOARD_GOAL_FILTER_OPTIONS: DashboardGoalFilter[] = ['全部', '进行中', '有风险', '已完成'];
+const CUSTOMER_DISPLAY_NAME_OVERRIDES: Record<string, string> = {
+  K2604100347139123: '胡苗华商户',
+  K2604210349432034: '谭嘉信息',
+  K2604211152018593: '谭晓信息',
+};
 
 const EVENT_LIST: EventItem[] = [
   { name: 'on_switch_view', desc: '切换视角时触发' },
@@ -953,6 +958,57 @@ function formatDateTime(value: string): string {
   return value && value !== '-' ? value.slice(5, 16) : '-';
 }
 
+function getCustomerDisplayName(customerId: string, name: string): string {
+  return CUSTOMER_DISPLAY_NAME_OVERRIDES[customerId] || name;
+}
+
+function formatChartCurrency(value: number): string {
+  if (value >= 10000) {
+    const amount = value / 10000;
+    return `¥${Number.isInteger(amount) ? amount : amount.toFixed(1)}万`;
+  }
+  return `¥${Math.round(value).toLocaleString('zh-CN')}`;
+}
+
+function formatRecentActivity(value: string): string {
+  if (!value || value === '-') {
+    return '-';
+  }
+  const diff = dayDiff(value);
+  if (diff < 0) {
+    return formatDate(value);
+  }
+  if (diff <= 30) {
+    return diff === 0 ? '今天' : `${diff}天前`;
+  }
+  return formatDate(value);
+}
+
+function formatTaskDueDate(value: string): string {
+  if (!value || value === '-') {
+    return '-';
+  }
+  const diff = dayDiff(value);
+  if (diff < -30 || diff > 30) {
+    return formatDate(value);
+  }
+  if (diff === 0) {
+    return '今天';
+  }
+  return diff > 0 ? `${diff}天前` : `${Math.abs(diff)}天后`;
+}
+
+function formatTaskLatestUpdate(value: string): string {
+  if (!value || value === '-') {
+    return '-';
+  }
+  const diff = dayDiff(value);
+  if (diff < 0 || diff > 30) {
+    return formatDate(value);
+  }
+  return diff === 0 ? '今天' : `${diff}天前`;
+}
+
 function dayDiff(value: string): number {
   if (!value || value === '-') {
     return 999;
@@ -1018,6 +1074,14 @@ function getDashboardGoalSummary(goal: GoalRecord, tasks: TaskRecord[]): { headl
   };
 }
 
+function getCustomerGoalProgress(goals: GoalRecord[]): { currentAmount: number; targetAmount: number; percent: number } {
+  const amountGoals = goals.filter((item) => (item.targetAmount || 0) > 0);
+  const targetAmount = amountGoals.reduce((sum, item) => sum + (item.targetAmount || 0), 0);
+  const currentAmount = amountGoals.reduce((sum, item) => sum + (item.currentAmount || 0), 0);
+  const percent = targetAmount > 0 ? Math.min(100, Math.round((currentAmount / targetAmount) * 100)) : 0;
+  return { currentAmount, targetAmount, percent };
+}
+
 function getTaskLatestLog(logs: ProgressLog[], taskId: string): ProgressLog | undefined {
   return logs
     .filter((item) => item.taskId === taskId)
@@ -1039,20 +1103,32 @@ function createDefaultDashboardTaskForm(assignee: string): DashboardTaskFormStat
   };
 }
 
-function createDefaultDashboardProgressForm(
-  task: TaskRecord | undefined,
-  owner: string,
-  latestLog?: ProgressLog
-): DashboardProgressFormState {
+function createDashboardTaskFormFromTask(task: TaskRecord): DashboardTaskFormState {
   return {
-    submittedBy: task?.assignee || owner,
-    progressPercent: latestLog
-      ? String(latestLog.progressPercent)
-      : task?.status === '已完成'
-        ? '100'
-        : task?.status === '未开始'
-          ? '10'
-          : '60',
+    title: task.title,
+    assignee: task.assignee,
+    dueDate: task.dueDate,
+    status: task.status,
+    priority: task.priority,
+    description: task.description,
+  };
+}
+
+function getAutoProgressPercent(status: TaskStatus, latestLog?: ProgressLog): number {
+  if (status === '已完成') {
+    return 100;
+  }
+  if (status === '未开始') {
+    return 10;
+  }
+  if (latestLog && latestLog.progressPercent > 0 && latestLog.progressPercent < 100) {
+    return latestLog.progressPercent;
+  }
+  return status === '有风险' ? 45 : 60;
+}
+
+function createDefaultDashboardProgressForm(task: TaskRecord | undefined): DashboardProgressFormState {
+  return {
     status: task?.status && task.status !== '未开始' ? task.status : '进行中',
     content: '',
   };
@@ -1181,6 +1257,37 @@ function buildLinePath(values: number[], width: number, height: number): string 
     .join(' ');
 }
 
+function buildScaledLinePath(values: number[], width: number, height: number, maxValue: number): string {
+  const safeValues = values.length > 0 ? values : [0];
+  const max = Math.max(maxValue, 1);
+  return safeValues
+    .map((value, index) => {
+      const x = safeValues.length === 1 ? width / 2 : (width / (safeValues.length - 1)) * index;
+      const y = height - (value / max) * height;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+}
+
+function getNiceAxisMax(value: number, segments = 4): number {
+  if (value <= 0) {
+    return segments;
+  }
+  const roughStep = value / segments;
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const normalized = roughStep / magnitude;
+  const niceStep =
+    normalized <= 1 ? 1
+      : normalized <= 2 ? 2
+        : normalized <= 5 ? 5
+          : 10;
+  return niceStep * magnitude * segments;
+}
+
+function isCompletedOrder(orderStatus: string): boolean {
+  return ['已完成', '已签收', '已收货'].some((keyword) => orderStatus.includes(keyword));
+}
+
 function uniqueNames(values: string[]): string[] {
   return Array.from(new Set(values.filter((item) => item && item !== '-')));
 }
@@ -1236,13 +1343,14 @@ function buildCustomerRows(
       const riskCount = customerGoals.filter((item) => item.status === '有风险').length;
       const activeCount = customerGoals.filter((item) => item.status === '进行中').length;
       const hasOngoingGoals = riskCount > 0 || activeCount > 0;
+      const goalProgress = getCustomerGoalProgress(customerGoals);
       const lastFollowAt =
         [customer.lastFollowAt, ...customerLogs.map((item) => item.submittedAt)]
           .sort((left, right) => toTimestamp(right) - toTimestamp(left))[0] || customer.lastFollowAt;
 
       return {
         customerId: customer.id,
-        customerName: customer.name,
+        customerName: getCustomerDisplayName(customer.id, customer.name),
         owner: customer.owner,
         followUpBy: customer.followUpBy,
         importanceLevel: customer.importanceLevel,
@@ -1255,6 +1363,9 @@ function buildCustomerRows(
         highPriorityOpenTaskCount: hasOngoingGoals ? openTasks.filter((item) => item.priority === '高').length : 0,
         riskTaskCount: customerTasks.filter((item) => item.status === '有风险').length,
         inProgressTaskCount: customerTasks.filter((item) => item.status === '进行中').length,
+        goalCurrentAmount: goalProgress.currentAmount,
+        goalTargetAmount: goalProgress.targetAmount,
+        goalProgressRate: goalProgress.percent,
         attentionStatus,
       };
     })
@@ -1440,10 +1551,47 @@ function buildSalespersonRows(
 }
 
 function buildTrendBuckets(logs: ProgressLog[], orders: OrderRecord[]) {
-  const labels = ['04-18', '04-19', '04-20', '04-21', '04-22', '04-23', '04-24'];
-  const followValues = labels.map((label) => logs.filter((item) => item.submittedAt.includes(label)).length);
-  const orderValues = labels.map((label) => orders.filter((item) => item.orderTime.includes(label)).length);
-  return { labels, followValues, orderValues };
+  const today = new Date(`${TODAY}T00:00:00`);
+  const buckets = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    const fullDate = date.toISOString().slice(0, 10);
+    const label = fullDate.slice(5);
+    const dayLogs = logs.filter((item) => item.submittedAt.startsWith(fullDate));
+    const dayOrders = orders.filter((item) => item.orderTime.startsWith(fullDate));
+    const completedOrders = dayOrders.filter((item) => isCompletedOrder(item.orderStatus));
+    const pendingOrders = dayOrders.filter((item) => !isCompletedOrder(item.orderStatus));
+    const topOrder = dayOrders.slice().sort((left, right) => right.orderAmount - left.orderAmount)[0];
+
+    return {
+      fullDate,
+      label,
+      followCount: dayLogs.length,
+      completedOrderCount: completedOrders.length,
+      pendingOrderCount: pendingOrders.length,
+      completedOrderAmount: completedOrders.reduce((sum, item) => sum + item.orderAmount, 0),
+      pendingOrderAmount: pendingOrders.reduce((sum, item) => sum + item.orderAmount, 0),
+      totalOrderAmount: dayOrders.reduce((sum, item) => sum + item.orderAmount, 0),
+      topProductName: topOrder?.productName || '-',
+    };
+  });
+
+  const labels = buckets.map((item) => item.label);
+  const followValues = buckets.map((item) => item.followCount);
+  const completedOrderAmounts = buckets.map((item) => item.completedOrderAmount);
+  const pendingOrderAmounts = buckets.map((item) => item.pendingOrderAmount);
+  const totalOrderAmounts = buckets.map((item) => item.totalOrderAmount);
+
+  return {
+    buckets,
+    labels,
+    followValues,
+    completedOrderAmounts,
+    pendingOrderAmounts,
+    totalOrderAmounts,
+    maxOrderAmount: Math.max(...totalOrderAmounts, 0),
+    maxFollowCount: Math.max(...followValues, 0),
+  };
 }
 
 function renderEmpty(message: string) {
@@ -1488,17 +1636,23 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
   const [selectedOwner, setSelectedOwner] = useState(ownerOptions.includes(initialQuery.owner) ? initialQuery.owner : DEFAULT_OWNER);
   const [chartHoverIndex, setChartHoverIndex] = useState<number | null>(null);
   const [selectedCustomerFilter, setSelectedCustomerFilter] = useState<CustomerFilterKey>('all');
+  const [customerKeyword, setCustomerKeyword] = useState('');
   const [salesGoalFilter, setSalesGoalFilter] = useState<DashboardGoalFilter>('全部');
+  const [salesTaskKeyword, setSalesTaskKeyword] = useState('');
+  const [salesTaskCustomerKeyword, setSalesTaskCustomerKeyword] = useState('');
+  const [salesTaskStartDate, setSalesTaskStartDate] = useState('');
+  const [salesTaskEndDate, setSalesTaskEndDate] = useState('');
   const [selectedSalesGoalId, setSelectedSalesGoalId] = useState('');
   const [selectedSalesTaskId, setSelectedSalesTaskId] = useState('');
+  const [salesProgressTaskId, setSalesProgressTaskId] = useState('');
   const [tasksData, setTasksData] = useState<TaskRecord[]>(initialTasks);
   const [logsData, setLogsData] = useState<ProgressLog[]>(initialLogs);
+  const [dismissedAlertIds, setDismissedAlertIds] = useState<string[]>([]);
   const [isSalesTaskFormOpen, setIsSalesTaskFormOpen] = useState(false);
+  const [editingSalesTaskId, setEditingSalesTaskId] = useState('');
   const [salesTaskForm, setSalesTaskForm] = useState<DashboardTaskFormState>(createDefaultDashboardTaskForm(DEFAULT_OWNER));
   const [isSalesProgressModalOpen, setIsSalesProgressModalOpen] = useState(false);
-  const [salesProgressForm, setSalesProgressForm] = useState<DashboardProgressFormState>(
-    createDefaultDashboardProgressForm(undefined, DEFAULT_OWNER)
-  );
+  const [salesProgressForm, setSalesProgressForm] = useState<DashboardProgressFormState>(createDefaultDashboardProgressForm(undefined));
 
   const { scopedCustomers, scopedGoals, scopedTasks, scopedLogs, scopedOrders } = getScopeData(
     currentView,
@@ -1512,9 +1666,23 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
 
   const customerRows = buildCustomerRows(scopedCustomers, scopedGoals, scopedTasks, scopedLogs);
   const alerts = buildAlerts(currentView, selectedOwner, scopedCustomers, scopedGoals, scopedTasks, scopedLogs);
-  const summary = buildSummary(currentView, selectedOwner, scopedCustomers, customerRows, scopedGoals, scopedTasks, alerts);
+  const visibleAlerts = useMemo(
+    () => alerts.filter((item) => !dismissedAlertIds.includes(item.id)),
+    [alerts, dismissedAlertIds]
+  );
+  const summary = buildSummary(
+    currentView,
+    selectedOwner,
+    scopedCustomers,
+    customerRows,
+    scopedGoals,
+    scopedTasks,
+    visibleAlerts
+  );
   const salespersonRows = buildSalespersonRows(ownerOptions, initialCustomers, initialGoals, tasksData, logsData);
   const trendBuckets = buildTrendBuckets(scopedLogs, scopedOrders);
+  const trendOrderAxisMax = getNiceAxisMax(trendBuckets.maxOrderAmount, 4);
+  const trendFollowAxisMax = getNiceAxisMax(trendBuckets.maxFollowCount, 4);
 
   const todayFollowCustomers = customerRows.filter((item) => dayDiff(item.lastFollowAt) >= 2 || dayDiff(scopedCustomers.find((customer) => customer.id === item.customerId)?.nextFollowUpAt || '') >= 0);
   const overdueTasks = scopedTasks.filter((item) => item.status !== '已完成' && dayDiff(item.dueDate) > 0);
@@ -1533,19 +1701,37 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
   const pushCustomers = customerRows.filter((item) => item.inProgressGoalCount > 0 || item.riskGoalCount > 0);
   const idleCustomers = customerRows.filter((item) => item.openTaskCount === 0);
   const priorityCustomers = customerRows.filter((item) => item.highPriorityOpenTaskCount > 0);
-  const customerNameMap = new Map(scopedCustomers.map((item) => [item.id, item.name]));
+  const customerNameMap = new Map(scopedCustomers.map((item) => [item.id, getCustomerDisplayName(item.id, item.name)]));
+  const latestOrderAmountByCustomer = useMemo(() => {
+    const map = new Map<string, number>();
+    const sortedOrders = scopedOrders.slice().sort((left, right) => toTimestamp(right.orderTime) - toTimestamp(left.orderTime));
+    sortedOrders.forEach((order) => {
+      if (!map.has(order.customerId)) {
+        map.set(order.customerId, order.orderAmount);
+      }
+    });
+    return map;
+  }, [scopedOrders]);
+  const normalizedCustomerKeyword = customerKeyword.trim().toLowerCase();
+  const normalizedSalesTaskKeyword = salesTaskKeyword.trim().toLowerCase();
+  const normalizedSalesTaskCustomerKeyword = salesTaskCustomerKeyword.trim().toLowerCase();
   const filteredCustomerRows = customerRows.filter((item) => {
     if (selectedCustomerFilter === 'focus') {
-      return item.importanceLevel === 'A';
+      if (item.importanceLevel !== 'A') {
+        return false;
+      }
     }
-    if (selectedCustomerFilter === 'progressing') {
-      return item.inProgressGoalCount > 0 || item.riskGoalCount > 0;
+    if (selectedCustomerFilter === 'progressing' && !(item.inProgressGoalCount > 0 || item.riskGoalCount > 0)) {
+      return false;
     }
-    if (selectedCustomerFilter === 'idle') {
-      return item.openTaskCount === 0;
+    if (selectedCustomerFilter === 'idle' && item.openTaskCount !== 0) {
+      return false;
     }
-    if (selectedCustomerFilter === 'priority') {
-      return item.highPriorityOpenTaskCount > 0;
+    if (selectedCustomerFilter === 'priority' && item.highPriorityOpenTaskCount <= 0) {
+      return false;
+    }
+    if (normalizedCustomerKeyword) {
+      return item.customerName.toLowerCase().includes(normalizedCustomerKeyword);
     }
     return true;
   });
@@ -1590,9 +1776,40 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
     () => scopedTasks.filter((item) => item.goalId === selectedSalesGoal?.id),
     [scopedTasks, selectedSalesGoal?.id]
   );
+  const filteredSalesTaskRows = useMemo(
+    () =>
+      selectedSalesGoalTasks.filter((task) => {
+        const taskCustomerName = customerNameMap.get(task.customerId) || '-';
+        if (normalizedSalesTaskKeyword && !task.title.toLowerCase().includes(normalizedSalesTaskKeyword)) {
+          return false;
+        }
+        if (normalizedSalesTaskCustomerKeyword && !taskCustomerName.toLowerCase().includes(normalizedSalesTaskCustomerKeyword)) {
+          return false;
+        }
+        if (salesTaskStartDate && task.dueDate < salesTaskStartDate) {
+          return false;
+        }
+        if (salesTaskEndDate && task.dueDate > salesTaskEndDate) {
+          return false;
+        }
+        return true;
+      }),
+    [
+      customerNameMap,
+      salesTaskEndDate,
+      salesTaskStartDate,
+      normalizedSalesTaskCustomerKeyword,
+      normalizedSalesTaskKeyword,
+      selectedSalesGoalTasks,
+    ]
+  );
   const selectedSalesTask = useMemo(
     () => selectedSalesGoalTasks.find((item) => item.id === selectedSalesTaskId),
     [selectedSalesGoalTasks, selectedSalesTaskId]
+  );
+  const editingSalesTask = useMemo(
+    () => scopedTasks.find((item) => item.id === editingSalesTaskId),
+    [editingSalesTaskId, scopedTasks]
   );
   const selectedSalesTaskLogs = useMemo(
     () =>
@@ -1601,22 +1818,17 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
         .sort((left, right) => toTimestamp(right.submittedAt) - toTimestamp(left.submittedAt)),
     [scopedLogs, selectedSalesTaskId]
   );
-  const contributionRows = customerRows
-    .slice()
-    .sort((left, right) => right.annualAmount - left.annualAmount)
-    .map((item) => ({
-      label: item.customerName,
-      value: item.annualAmount,
-      ratio: summary.currentAmount > 0 ? Math.min(100, (item.annualAmount / customerRows.reduce((sum, row) => sum + row.annualAmount, 0)) * 100) : 0,
-    }));
-  const totalAnnualAmount = customerRows.reduce((sum, item) => sum + item.annualAmount, 0);
-  const keyContribution = totalAnnualAmount > 0
-    ? (customerRows.filter((item) => item.importanceLevel === 'A').reduce((sum, item) => sum + item.annualAmount, 0) / totalAnnualAmount) * 100
-    : 0;
-  const topOneConcentration = contributionRows[0] && totalAnnualAmount > 0 ? (contributionRows[0].value / totalAnnualAmount) * 100 : 0;
-  const followCoverage = summary.customerCount > 0 ? (summary.activeCustomerCount / summary.customerCount) * 100 : 0;
-  const riskExposure = summary.customerCount > 0 ? (summary.riskCustomerCount / summary.customerCount) * 100 : 0;
-
+  const salesProgressTask = useMemo(
+    () => scopedTasks.find((item) => item.id === salesProgressTaskId),
+    [scopedTasks, salesProgressTaskId]
+  );
+  const salesProgressTaskLogs = useMemo(
+    () =>
+      scopedLogs
+        .filter((item) => item.taskId === salesProgressTaskId)
+        .sort((left, right) => toTimestamp(right.submittedAt) - toTimestamp(left.submittedAt)),
+    [scopedLogs, salesProgressTaskId]
+  );
   useEffect(() => {
     const nextGoalId = selectedSalesGoal?.id || '';
     if (selectedSalesGoalId !== nextGoalId) {
@@ -1638,11 +1850,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
 
   useEffect(() => {
     if (!isSalesProgressModalOpen) {
-      setSalesProgressForm(
-        createDefaultDashboardProgressForm(selectedSalesTask, selectedOwner, selectedSalesTaskLogs[0])
-      );
+      setSalesProgressForm(createDefaultDashboardProgressForm(salesProgressTask));
     }
-  }, [isSalesProgressModalOpen, selectedOwner, selectedSalesTask, selectedSalesTaskLogs]);
+  }, [isSalesProgressModalOpen, salesProgressTask]);
 
   function emitEvent(name: string, payload?: Record<string, unknown>) {
     try {
@@ -1703,9 +1913,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
     }
   }
 
-  function selectSalesGoal(goalId: string) {
-    setSelectedSalesGoalId(goalId);
-    setSelectedSalesTaskId('');
+  function dismissAlert(alertId: string) {
+    setDismissedAlertIds((current) => (current.includes(alertId) ? current : [...current, alertId]));
   }
 
   function openSalesTask(taskId: string) {
@@ -1714,33 +1923,65 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
 
   function closeSalesTaskDrawer() {
     setSelectedSalesTaskId('');
-    setIsSalesProgressModalOpen(false);
+    closeSalesProgressModal();
   }
 
   function closeSalesTaskForm() {
     setIsSalesTaskFormOpen(false);
+    setEditingSalesTaskId('');
     setSalesTaskForm(createDefaultDashboardTaskForm(selectedOwner));
+  }
+
+  function openEditSalesTask(task: TaskRecord) {
+    setEditingSalesTaskId(task.id);
+    setSalesTaskForm(createDashboardTaskFormFromTask(task));
+    setIsSalesTaskFormOpen(true);
+  }
+
+  function openSalesProgressModalForTask(task: TaskRecord) {
+    setSalesProgressTaskId(task.id);
+    setSalesProgressForm(createDefaultDashboardProgressForm(task));
+    setIsSalesProgressModalOpen(true);
   }
 
   function openSalesProgressModal() {
     if (!selectedSalesTask) {
       return;
     }
-    setSalesProgressForm(
-      createDefaultDashboardProgressForm(selectedSalesTask, selectedOwner, selectedSalesTaskLogs[0])
-    );
+    setSalesProgressTaskId(selectedSalesTask.id);
+    setSalesProgressForm(createDefaultDashboardProgressForm(selectedSalesTask));
     setIsSalesProgressModalOpen(true);
   }
 
   function closeSalesProgressModal() {
     setIsSalesProgressModalOpen(false);
-    setSalesProgressForm(
-      createDefaultDashboardProgressForm(selectedSalesTask, selectedOwner, selectedSalesTaskLogs[0])
-    );
+    setSalesProgressTaskId('');
+    setSalesProgressForm(createDefaultDashboardProgressForm(undefined));
   }
 
   function handleCreateSalesTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (editingSalesTaskId) {
+      setTasksData((current) =>
+        current.map((task) =>
+          task.id === editingSalesTaskId
+            ? {
+                ...task,
+                title: salesTaskForm.title || '未命名任务',
+                assignee: salesTaskForm.assignee || selectedOwner,
+                dueDate: salesTaskForm.dueDate || TODAY,
+                status: salesTaskForm.status,
+                priority: salesTaskForm.priority,
+                description: salesTaskForm.description || '任务说明待补充',
+              }
+            : task
+        )
+      );
+      setSelectedSalesTaskId(editingSalesTaskId);
+      closeSalesTaskForm();
+      return;
+    }
+
     if (!selectedSalesGoal) {
       return;
     }
@@ -1765,20 +2006,20 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
 
   function handleSubmitSalesProgress(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedSalesTask) {
+    if (!salesProgressTask) {
       return;
     }
 
     const submittedAt = createPrototypeDateTime(logsData.length + 1);
-    const progressPercent = Math.max(0, Math.min(100, Math.round(parseNumber(salesProgressForm.progressPercent))));
-    const submittedBy = salesProgressForm.submittedBy.trim() || selectedSalesTask.assignee || selectedOwner;
+    const progressPercent = getAutoProgressPercent(salesProgressForm.status, salesProgressTaskLogs[0]);
+    const submittedBy = operatorName;
     const content = salesProgressForm.content.trim() || '已补充最新推进说明，待继续跟进。';
     const nextStatus = salesProgressForm.status;
 
     const nextLog: ProgressLog = {
       id: `log-${Date.now()}`,
-      taskId: selectedSalesTask.id,
-      customerId: selectedSalesTask.customerId,
+      taskId: salesProgressTask.id,
+      customerId: salesProgressTask.customerId,
       submittedBy,
       submittedAt,
       progressPercent,
@@ -1789,7 +2030,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
     setLogsData((current) => [nextLog, ...current]);
     setTasksData((current) =>
       current.map((task) =>
-        task.id === selectedSalesTask.id
+        task.id === salesProgressTask.id
           ? {
               ...task,
               status: nextStatus,
@@ -1815,7 +2056,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
           return summary.customerCount;
         }
         if (name === 'alert_count') {
-          return alerts.length;
+          return visibleAlerts.length;
         }
         if (name === 'key_customer_count') {
           return summary.keyCustomerCount;
@@ -1839,7 +2080,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
       configList: CONFIG_LIST,
       dataList: DATA_LIST,
     }),
-    [alerts.length, currentView, selectedOwner, summary.customerCount, summary.keyCustomerCount, summary.overdueTaskCount]
+    [currentView, selectedOwner, summary.customerCount, summary.keyCustomerCount, summary.overdueTaskCount, visibleAlerts.length]
   );
 
   return (
@@ -1956,8 +2197,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
               <div className="crm-dashboard-panel-header">
                 <div>
                   <div className="crm-dashboard-panel-title">
-                    <span className="crm-dashboard-panel-bar" />
-                    <span>{currentView === 'leader' ? '目标与执行区' : '我的目标达成区'}</span>
+                    {currentView === 'leader' ? <span className="crm-dashboard-panel-bar" /> : null}
+                    <span>{currentView === 'leader' ? '目标与执行区' : '我的任务'}</span>
                   </div>
                 </div>
                 {currentView === 'sales' ? (
@@ -1984,8 +2225,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                     <span>业务员</span>
                     <span>负责/跟进客户</span>
                     <span>A级客户</span>
-                    <span>目标达成率</span>
-                    <span>风险目标</span>
+                    <span>目标进度</span>
+                    <span>风险任务</span>
                     <span>逾期任务</span>
                     <span>最近跟进</span>
                     <span>操作</span>
@@ -1995,14 +2236,26 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                       <div className="crm-dashboard-table-row" key={row.salespersonName}>
                         <div className="crm-dashboard-table-main">
                           <strong>{row.salespersonName}</strong>
-                          <small>{formatCurrency(row.currentAmount)} / {formatCurrency(row.targetAmount)}</small>
                         </div>
                         <span>{row.managedCustomerCount}</span>
                         <span>{row.keyCustomerCount}</span>
-                        <span>{formatPercent(row.progressRate)}</span>
+                        <div
+                          className="crm-dashboard-table-progress"
+                          aria-label={`目标进度 ${formatPercent(row.progressRate)}`}
+                          title={`目标进度 ${formatPercent(row.progressRate)}`}
+                        >
+                          <div className="crm-dashboard-progress-track">
+                            <span style={{ width: `${row.progressRate}%` }} />
+                          </div>
+                          <small>
+                            {row.targetAmount > 0
+                              ? `${formatCurrency(row.currentAmount)}/${formatCurrency(row.targetAmount)}`
+                              : '-'}
+                          </small>
+                        </div>
                         <span>{row.riskGoalCount}</span>
                         <span>{row.overdueTaskCount}</span>
-                        <span>{formatDateTime(row.lastFollowAt)}</span>
+                        <span>{formatRecentActivity(row.lastFollowAt)}</span>
                         <button className="crm-dashboard-link-button" type="button" onClick={() => openSalesView(row.salespersonName)}>
                           查看个人盘
                         </button>
@@ -2014,75 +2267,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                 </div>
               ) : (
                 <React.Fragment>
-                  <div className="crm-dashboard-goal-grid">
-                    {filteredSalesGoals.length > 0 ? (
-                      filteredSalesGoals.map((goal) => {
-                        const relatedTasks = scopedTasks.filter((item) => item.goalId === goal.id);
-                        const goalSummary = getDashboardGoalSummary(goal, scopedTasks);
-                        const linkedOrderCount = scopedOrders.filter((item) => item.customerId === goal.customerId).length;
-                        const goalDisplayStatus = relatedTasks
-                          .slice()
-                          .sort((left, right) => toTimestamp(right.latestProgressAt) - toTimestamp(left.latestProgressAt))[0]
-                          ?.status || goal.status;
-                        const customerName = customerNameMap.get(goal.customerId) || '-';
-                        const isSelected = selectedSalesGoal?.id === goal.id;
-                        return (
-                          <button
-                            className={`crm-dashboard-sales-goal-card${isSelected ? ' is-selected' : ''}`}
-                            key={goal.id}
-                            type="button"
-                            onClick={() => selectSalesGoal(goal.id)}
-                          >
-                            <div className="crm-dashboard-sales-goal-top">
-                              <span className={`crm-dashboard-status-badge ${getStatusClass(goalDisplayStatus)}`}>{goalDisplayStatus}</span>
-                            </div>
-                            <strong>{goal.title}</strong>
-                            <p>{goal.summary}</p>
-                            <div className="crm-dashboard-sales-goal-metric">
-                              <span>{goalSummary.headline}</span>
-                              {goalSummary.progressText ? <span>{goalSummary.progressText}</span> : null}
-                            </div>
-                            <div className="crm-dashboard-progress-track">
-                              <span style={{ width: `${goalSummary.percent}%` }} />
-                            </div>
-                            <div className="crm-dashboard-sales-goal-meta">
-                              <span>客户：{customerName}</span>
-                              <span>负责人：{goal.owner}</span>
-                              <span>截止：{formatDate(goal.endDate)}</span>
-                              <span>关联订单：{linkedOrderCount}</span>
-                            </div>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      renderEmpty('当前筛选条件下暂无目标')
-                    )}
-                  </div>
-
                   <div className="crm-dashboard-goal-task-section">
-                    <div className="crm-dashboard-panel-header">
-                      <div>
-                        <div className="crm-dashboard-panel-title">
-                          <span className="crm-dashboard-panel-bar" />
-                          <span>目标下任务</span>
-                        </div>
-                      </div>
-                      <div className="crm-dashboard-panel-summary">
-                        <span>任务数 {selectedSalesGoalTasks.length}</span>
-                        <span>进行中 {selectedSalesGoalTasks.filter((item) => item.status === '进行中').length}</span>
-                        <span>风险 {selectedSalesGoalTasks.filter((item) => item.status === '有风险').length}</span>
-                        <button
-                          className="crm-dashboard-primary-button"
-                          type="button"
-                          onClick={() => setIsSalesTaskFormOpen(true)}
-                          disabled={!selectedSalesGoal}
-                        >
-                          <Plus size={12} />
-                          新建任务
-                        </button>
-                      </div>
-                    </div>
-
                     {isSalesTaskFormOpen ? (
                       <React.Fragment>
                         <div className="crm-dashboard-drawer-mask" aria-hidden="true" onClick={closeSalesTaskForm} />
@@ -2093,9 +2278,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                           role="dialog"
                         >
                           <div className="crm-dashboard-modal-header">
-                            <h3 id="crm-dashboard-task-modal-title">新建目标下任务</h3>
+                            <h3 id="crm-dashboard-task-modal-title">{editingSalesTaskId ? '编辑任务' : '新建目标下任务'}</h3>
                             <button
-                              aria-label="关闭新建任务弹窗"
+                              aria-label={editingSalesTaskId ? '关闭编辑任务弹窗' : '关闭新建任务弹窗'}
                               className="crm-dashboard-icon-button"
                               type="button"
                               onClick={closeSalesTaskForm}
@@ -2105,6 +2290,12 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                           </div>
                           <form className="crm-dashboard-inline-form is-modal" onSubmit={handleCreateSalesTask}>
                             <div className="crm-dashboard-form-grid">
+                              {editingSalesTask ? (
+                                <label>
+                                  <span>所属客户</span>
+                                  <input readOnly value={customerNameMap.get(editingSalesTask.customerId) || '-'} />
+                                </label>
+                              ) : null}
                               <label>
                                 <span>任务名称</span>
                                 <input
@@ -2170,7 +2361,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                                 取消
                               </button>
                               <button className="crm-dashboard-primary-button" type="submit">
-                                保存任务
+                                {editingSalesTaskId ? '保存修改' : '保存任务'}
                               </button>
                             </div>
                           </form>
@@ -2179,6 +2370,46 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                     ) : null}
 
                     <div className="crm-dashboard-task-table">
+                      <div className="crm-dashboard-task-search-row">
+                        <label className="crm-dashboard-task-search-field">
+                          <span>所属客户</span>
+                          <input
+                            type="search"
+                            value={salesTaskCustomerKeyword}
+                            onChange={(event) => setSalesTaskCustomerKeyword(event.target.value)}
+                            placeholder="搜索所属客户"
+                            aria-label="搜索所属客户"
+                          />
+                        </label>
+                        <label className="crm-dashboard-task-search-field">
+                          <span>任务名称</span>
+                          <input
+                            type="search"
+                            value={salesTaskKeyword}
+                            onChange={(event) => setSalesTaskKeyword(event.target.value)}
+                            placeholder="搜索任务名称"
+                            aria-label="搜索任务名称"
+                          />
+                        </label>
+                        <label className="crm-dashboard-task-search-field crm-dashboard-task-search-field-date-range">
+                          <span>目标日期</span>
+                          <div className="crm-dashboard-task-date-range-inputs">
+                            <input
+                              type="date"
+                              value={salesTaskStartDate}
+                              onChange={(event) => setSalesTaskStartDate(event.target.value)}
+                              aria-label="搜索开始日期"
+                            />
+                            <span>至</span>
+                            <input
+                              type="date"
+                              value={salesTaskEndDate}
+                              onChange={(event) => setSalesTaskEndDate(event.target.value)}
+                              aria-label="搜索结束日期"
+                            />
+                          </div>
+                        </label>
+                      </div>
                       <div className="crm-dashboard-task-head">
                         <span>任务名称</span>
                         <span>状态</span>
@@ -2186,14 +2417,16 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                         <span>指定人</span>
                         <span>目标日期</span>
                         <span>所属客户</span>
+                        <span>订单金额</span>
                         <span>最近更新</span>
                         <span>操作</span>
                       </div>
                       {selectedSalesGoal ? (
-                        selectedSalesGoalTasks.length > 0 ? (
-                          selectedSalesGoalTasks.map((task) => {
+                        filteredSalesTaskRows.length > 0 ? (
+                          filteredSalesTaskRows.map((task) => {
                             const latestLog = getTaskLatestLog(scopedLogs, task.id);
                             const taskCustomerName = customerNameMap.get(task.customerId) || '-';
+                            const latestOrderAmount = latestOrderAmountByCustomer.get(task.customerId);
                             return (
                               <div
                                 className={`crm-dashboard-task-row${selectedSalesTask?.id === task.id ? ' is-selected' : ''}`}
@@ -2208,20 +2441,26 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                                 <span>{task.assignee}</span>
                                 <span>
                                   {isTaskOverdue(task) ? <span className="crm-dashboard-overdue-label">逾期</span> : null}
-                                  {formatDate(task.dueDate)}
+                                  {formatTaskDueDate(task.dueDate)}
                                 </span>
                                 <span>{taskCustomerName}</span>
-                                <span>{latestLog ? formatDate(latestLog.submittedAt) : '-'}</span>
+                                <span>{typeof latestOrderAmount === 'number' ? formatCurrency(latestOrderAmount) : '-'}</span>
+                                <span>{latestLog ? formatTaskLatestUpdate(latestLog.submittedAt) : '-'}</span>
                                 <div className="crm-dashboard-task-actions">
-                                  <button type="button" onClick={() => openSalesTask(task.id)}>
-                                    查看
+                                  <button type="button" onClick={() => openEditSalesTask(task)}>
+                                    编辑
+                                  </button>
+                                  <button type="button" onClick={() => openSalesProgressModalForTask(task)}>
+                                    新增跟进
                                   </button>
                                 </div>
                               </div>
                             );
                           })
                         ) : (
-                          <div className="crm-dashboard-empty-row">当前目标下暂无任务。</div>
+                          <div className="crm-dashboard-empty-row">
+                            {selectedSalesGoalTasks.length > 0 ? '当前搜索条件下暂无任务。' : '当前目标下暂无任务。'}
+                          </div>
                         )
                       ) : (
                         <div className="crm-dashboard-empty-row">当前筛选条件下暂无可查看的目标。</div>
@@ -2355,7 +2594,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                     </React.Fragment>
                   ) : null}
 
-                  {selectedSalesTask && isSalesProgressModalOpen ? (
+                  {salesProgressTask && isSalesProgressModalOpen ? (
                     <React.Fragment>
                       <div className="crm-dashboard-drawer-mask" aria-hidden="true" onClick={closeSalesProgressModal} />
                       <div className="crm-dashboard-modal" role="dialog" aria-modal="true" aria-label="提交任务进度">
@@ -2373,22 +2612,12 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                         <form className="crm-dashboard-inline-form is-modal" onSubmit={handleSubmitSalesProgress}>
                           <div className="crm-dashboard-form-grid">
                             <label>
-                              <span>提交人</span>
-                              <input
-                                value={salesProgressForm.submittedBy}
-                                onChange={(event) =>
-                                  setSalesProgressForm((current) => ({ ...current, submittedBy: event.target.value }))
-                                }
-                              />
+                              <span>任务名称</span>
+                              <input readOnly value={salesProgressTask.title} />
                             </label>
                             <label>
-                              <span>进度%</span>
-                              <input
-                                value={salesProgressForm.progressPercent}
-                                onChange={(event) =>
-                                  setSalesProgressForm((current) => ({ ...current, progressPercent: event.target.value }))
-                                }
-                              />
+                              <span>所属客户</span>
+                              <input readOnly value={customerNameMap.get(salesProgressTask.customerId) || '-'} />
                             </label>
                             <label>
                               <span>任务状态</span>
@@ -2438,7 +2667,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                 <div>
                   <div className="crm-dashboard-panel-title">
                     <span className="crm-dashboard-panel-bar" />
-                    <span>{currentView === 'leader' ? '客户清单区' : '我的客户分层与重点客户维护'}</span>
+                    <span>{currentView === 'leader' ? '客户清单区' : '我的客户'}</span>
                   </div>
                                   </div>
               </div>
@@ -2460,6 +2689,17 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                 })}
               </div>
 
+              <div className="crm-dashboard-customer-search">
+                <Search size={16} />
+                <input
+                  type="search"
+                  value={customerKeyword}
+                  onChange={(event) => setCustomerKeyword(event.target.value)}
+                  placeholder="搜索客户名称"
+                  aria-label="搜索客户名称"
+                />
+              </div>
+
               <div className="crm-dashboard-table-card">
                 <div className="crm-dashboard-table-head">
                   <span>客户</span>
@@ -2467,8 +2707,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                   <span>客户级别</span>
                   <span>最近跟进</span>
                   <span>最近下单</span>
-                  <span>目标状态</span>
-                  <span>未完任务</span>
+                  <span>任务状态</span>
+                  <span>目标进度</span>
                   <span>操作</span>
                 </div>
                 {filteredCustomerRows.length > 0 ? (
@@ -2477,23 +2717,31 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                       <div className="crm-dashboard-table-row" key={row.customerId}>
                         <div className="crm-dashboard-table-main">
                           <strong>{row.customerName}</strong>
-                          <small>{formatCurrency(row.annualAmount)}</small>
                         </div>
                         <span>{row.owner} / {row.followUpBy}</span>
                         <span className={`crm-dashboard-importance-chip is-${row.importanceLevel}`}>
                           {row.importanceLevel === 'A' ? 'A级' : row.importanceLevel === 'B' ? 'B级' : 'C级'}
                         </span>
-                        <span>{formatDateTime(row.lastFollowAt)}</span>
-                        <span>{formatDateTime(row.lastOrderAt)}</span>
+                        <span>{formatRecentActivity(row.lastFollowAt)}</span>
+                        <span>{formatRecentActivity(row.lastOrderAt)}</span>
                         <div className="crm-dashboard-status-stack">
-                          {row.riskGoalCount > 0 ? (
-                            <span className="crm-dashboard-status-badge is-risk">有风险{row.riskGoalCount}</span>
+                          {row.riskTaskCount > 0 ? (
+                            <span className="crm-dashboard-status-badge is-risk">有风险{row.riskTaskCount}</span>
                           ) : null}
-                          {row.inProgressGoalCount > 0 ? (
-                            <span className="crm-dashboard-status-badge is-active">进行中{row.inProgressGoalCount}</span>
+                          {row.inProgressTaskCount > 0 ? (
+                            <span className="crm-dashboard-status-badge is-active">进行中{row.inProgressTaskCount}</span>
                           ) : null}
                         </div>
-                        <span>{row.openTaskCount} / 高优先 {row.highPriorityOpenTaskCount}</span>
+                        <div className="crm-dashboard-table-progress">
+                          <div className="crm-dashboard-progress-track">
+                            <span style={{ width: `${row.goalProgressRate}%` }} />
+                          </div>
+                          <small>
+                            {row.goalTargetAmount > 0
+                              ? `${formatCurrency(row.goalCurrentAmount)}/${formatCurrency(row.goalTargetAmount)}`
+                              : '-'}
+                          </small>
+                        </div>
                         <button className="crm-dashboard-link-button" type="button" onClick={() => viewCustomer(row.customerId)}>
                           进入客户
                         </button>
@@ -2501,7 +2749,13 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                     );
                   })
                 ) : (
-                  renderEmpty(selectedCustomerFilter === 'all' ? '当前视角暂无客户数据' : '当前筛选条件下暂无客户')
+                  renderEmpty(
+                    normalizedCustomerKeyword
+                      ? '未找到匹配的客户名称'
+                      : selectedCustomerFilter === 'all'
+                        ? '当前视角暂无客户数据'
+                        : '当前筛选条件下暂无客户'
+                  )
                 )}
               </div>
                         </article>
@@ -2518,24 +2772,42 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                                   </div>
               </div>
               <div className="crm-dashboard-alert-list">
-                {alerts.length > 0 ? (
-                  alerts.map((alert) => (
-                    <article className={`crm-dashboard-alert-card is-${alert.severity}`} key={alert.id}>
+                {visibleAlerts.length > 0 ? (
+                  visibleAlerts.map((alert) => (
+                    <article
+                      className={`crm-dashboard-alert-card is-${alert.severity}`}
+                      key={alert.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => viewCustomer(alert.customerId)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          viewCustomer(alert.customerId);
+                        }
+                      }}
+                    >
                       <div className="crm-dashboard-alert-top">
-                        <span className={`crm-dashboard-severity-chip is-${alert.severity}`}>{alert.severity}风险</span>
-                        <strong>{alert.alertType}</strong>
+                        <div className="crm-dashboard-alert-title">
+                          <span className={`crm-dashboard-severity-chip is-${alert.severity}`}>{alert.severity}风险</span>
+                          <strong>{alert.alertType}</strong>
+                        </div>
+                        <button
+                          className="crm-dashboard-icon-button crm-dashboard-alert-close"
+                          type="button"
+                          aria-label={`删除${alert.alertType}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            dismissAlert(alert.id);
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
                       </div>
-                      <p>{alert.reason}</p>
                       <div className="crm-dashboard-alert-meta">
                         <span>客户：{alert.customerName}</span>
                         <span>责任人：{alert.owner || selectedOwner}</span>
                         <span>时限：{formatDate(alert.dueAt)}</span>
-                      </div>
-                      <div className="crm-dashboard-alert-foot">
-                        <small>{alert.suggestedAction}</small>
-                        <button className="crm-dashboard-link-button" type="button" onClick={() => viewCustomer(alert.customerId)}>
-                          进入客户
-                        </button>
                       </div>
                     </article>
                   ))
@@ -2556,46 +2828,139 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
               </div>
               <div className="crm-dashboard-chart-card">
                 <div className="crm-dashboard-chart-head">
-                  <strong>{currentView === 'leader' ? '团队跟进 / 下单趋势' : '我的跟进 / 下单趋势'}</strong>
-                  <span>按最近 7 天统计</span>
+                  <div className="crm-dashboard-chart-legend-inline" aria-label="图表图例">
+                    <span><i className="is-completed" />已完成订单</span>
+                    <span><i className="is-pending" />未完成订单</span>
+                    <span><i className="is-follow" />跟进次数</span>
+                  </div>
                 </div>
                 <svg
                   className="crm-dashboard-line-chart"
-                  viewBox="0 0 320 168"
+                  viewBox="0 0 360 220"
                   onMouseLeave={() => setChartHoverIndex(null)}
                 >
-                  <path className="crm-dashboard-line-grid" d="M 0 42 H 320 M 0 84 H 320 M 0 126 H 320" />
-                  <path className="crm-dashboard-line-axis" d="M 0 146 H 320" />
-                  <path className="crm-dashboard-line-path is-follow" d={buildLinePath(trendBuckets.followValues, 320, 144)} />
-                  <path className="crm-dashboard-line-path is-order" d={buildLinePath(trendBuckets.orderValues, 320, 144)} />
-                  {trendBuckets.labels.map((label, index) => {
-                    const x = trendBuckets.labels.length === 1 ? 160 : (320 / (trendBuckets.labels.length - 1)) * index;
-                    const followY = 144 - (trendBuckets.followValues[index] / Math.max(...trendBuckets.followValues, 1)) * 144;
-                    const orderY = 144 - (trendBuckets.orderValues[index] / Math.max(...trendBuckets.orderValues, 1)) * 144;
-                    const isHovered = chartHoverIndex === index;
-                    const slotWidth = trendBuckets.labels.length === 1 ? 320 : 320 / trendBuckets.labels.length;
-                    const hitX = Math.max(0, x - slotWidth / 2);
-                    const hitWidth = Math.min(320 - hitX, slotWidth);
+                  <defs>
+                    <linearGradient id="crmDashboardCompleteGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#86efac" />
+                      <stop offset="100%" stopColor="#22c55e" />
+                    </linearGradient>
+                    <linearGradient id="crmDashboardPendingGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#fdba74" />
+                      <stop offset="100%" stopColor="#f97316" />
+                    </linearGradient>
+                  </defs>
+                  {(() => {
+                    const chartWidth = 360;
+                    const chartHeight = 220;
+                    const padding = { top: 18, right: 30, bottom: 34, left: 42 };
+                    const plotWidth = chartWidth - padding.left - padding.right;
+                    const plotHeight = chartHeight - padding.top - padding.bottom;
+                    const baseY = padding.top + plotHeight;
+                    const bucketCount = trendBuckets.labels.length;
+                    const segmentWidth = bucketCount > 1 ? plotWidth / (bucketCount - 1) : plotWidth;
+                    const hitSlotWidth = bucketCount > 0 ? plotWidth / bucketCount : plotWidth;
+                    const amountTicks = Array.from({ length: 4 }, (_, index) => {
+                      const value = Math.round((trendOrderAxisMax / 4) * (4 - index));
+                      const y = padding.top + (plotHeight / 4) * index;
+                      return { value, y };
+                    });
+                    const followTicks = Array.from({ length: 3 }, (_, index) => {
+                      const ratio = 1 - index / 2;
+                      return {
+                        value: Math.round(trendFollowAxisMax * ratio),
+                        y: padding.top + plotHeight * (index / 2),
+                      };
+                    });
 
                     return (
-                      <g key={label}>
-                        <rect
-                          className="crm-dashboard-chart-hit-area"
-                          x={hitX}
-                          y={0}
-                          width={hitWidth}
-                          height={152}
-                          onMouseEnter={() => setChartHoverIndex(index)}
-                        />
-                        {isHovered ? <line className="crm-dashboard-chart-guide-line" x1={x} y1={0} x2={x} y2={146} /> : null}
-                        <circle className="crm-dashboard-chart-dot is-follow" cx={x} cy={followY} r={isHovered ? 4.5 : 0} />
-                        <circle className="crm-dashboard-chart-dot is-order" cx={x} cy={orderY} r={isHovered ? 4.5 : 0} />
-                        <text className="crm-dashboard-chart-axis-label" x={x} y={160} textAnchor="middle">
-                          {label}
+                      <>
+                        {amountTicks.map((tick) => (
+                          <g key={`tick-${tick.value}`}>
+                            <line className="crm-dashboard-line-grid" x1={padding.left} y1={tick.y} x2={chartWidth - padding.right} y2={tick.y} />
+                            <text className="crm-dashboard-chart-axis-label is-left" x={0} y={tick.y + 4}>
+                              {formatChartCurrency(tick.value)}
+                            </text>
+                          </g>
+                        ))}
+                        <line className="crm-dashboard-line-axis" x1={padding.left} y1={baseY} x2={chartWidth - padding.right} y2={baseY} />
+                        <text className="crm-dashboard-chart-axis-label is-left" x={0} y={baseY + 4}>
+                          ¥0
                         </text>
-                      </g>
+                        <g transform={`translate(${padding.left}, ${padding.top})`}>
+                          <path
+                            className="crm-dashboard-line-path is-follow"
+                            d={buildScaledLinePath(trendBuckets.followValues, plotWidth, plotHeight, trendFollowAxisMax)}
+                          />
+                        </g>
+                        {trendBuckets.buckets.map((bucket, index) => {
+                          const x = padding.left + (bucketCount === 1 ? plotWidth / 2 : segmentWidth * index);
+                          const completedHeight = trendOrderAxisMax > 0 ? (bucket.completedOrderAmount / trendOrderAxisMax) * plotHeight : 0;
+                          const pendingHeight = trendOrderAxisMax > 0 ? (bucket.pendingOrderAmount / trendOrderAxisMax) * plotHeight : 0;
+                          const followY = padding.top + plotHeight - (bucket.followCount / Math.max(trendFollowAxisMax, 1)) * plotHeight;
+                          const isHovered = chartHoverIndex === index;
+                          const hitX = Math.max(padding.left, x - hitSlotWidth / 2);
+                          const hitWidth = Math.min(chartWidth - padding.right - hitX, hitSlotWidth);
+                          const barWidth = 28;
+                          const completedY = baseY - completedHeight;
+                          const pendingY = completedY - pendingHeight;
+
+                          return (
+                            <g key={bucket.label}>
+                              {isHovered ? (
+                                <rect
+                                  className="crm-dashboard-chart-hover-band"
+                                  x={hitX}
+                                  y={padding.top}
+                                  width={hitWidth}
+                                  height={plotHeight}
+                                  rx={14}
+                                />
+                              ) : null}
+                              <rect
+                                className="crm-dashboard-chart-hit-area"
+                                x={hitX}
+                                y={padding.top}
+                                width={hitWidth}
+                                height={plotHeight + 18}
+                                onMouseEnter={() => setChartHoverIndex(index)}
+                              />
+                              {completedHeight > 0 ? (
+                                <rect
+                                  className="crm-dashboard-chart-bar is-completed"
+                                  x={x - barWidth / 2}
+                                  y={completedY}
+                                  width={barWidth}
+                                  height={completedHeight}
+                                  rx={8}
+                                />
+                              ) : null}
+                              {pendingHeight > 0 ? (
+                                <rect
+                                  className="crm-dashboard-chart-bar is-pending"
+                                  x={x - barWidth / 2}
+                                  y={pendingY}
+                                  width={barWidth}
+                                  height={pendingHeight}
+                                  rx={8}
+                                />
+                              ) : null}
+                              {isHovered ? <line className="crm-dashboard-chart-guide-line" x1={x} y1={padding.top} x2={x} y2={baseY} /> : null}
+                              <circle className="crm-dashboard-chart-point-ring" cx={x} cy={followY} r={7} />
+                              <circle className="crm-dashboard-chart-point-fill" cx={x} cy={followY} r={4} />
+                              <text className="crm-dashboard-chart-axis-label" x={x} y={chartHeight - 8} textAnchor="middle">
+                                {bucket.label}
+                              </text>
+                            </g>
+                          );
+                        })}
+                        {followTicks.map((tick) => (
+                          <text key={`follow-${tick.value}`} className="crm-dashboard-chart-axis-label is-right" x={chartWidth - 2} y={tick.y + 4} textAnchor="end">
+                            {tick.value}次
+                          </text>
+                        ))}
+                      </>
                     );
-                  })}
+                  })()}
                 </svg>
                 <div
                   className={`crm-dashboard-chart-tooltip${chartHoverIndex !== null ? ' is-visible' : ''}`}
@@ -2605,7 +2970,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                           left: `${
                             trendBuckets.labels.length === 1
                               ? 50
-                              : (chartHoverIndex / (trendBuckets.labels.length - 1)) * 100
+                              : Math.max(16, Math.min(84, (chartHoverIndex / (trendBuckets.labels.length - 1)) * 100))
                           }%`,
                         }
                       : undefined
@@ -2613,40 +2978,26 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmDashboard(inne
                 >
                   {chartHoverIndex !== null && (
                     <>
-                      <div className="crm-dashboard-chart-tooltip-date">{trendBuckets.labels[chartHoverIndex]}</div>
+                      <div className="crm-dashboard-chart-tooltip-date">{trendBuckets.buckets[chartHoverIndex].fullDate}</div>
+                      <div className="crm-dashboard-chart-tooltip-total">{formatCurrency(trendBuckets.buckets[chartHoverIndex].totalOrderAmount)}</div>
+                      <div className="crm-dashboard-chart-tooltip-summary">
+                        {trendBuckets.buckets[chartHoverIndex].completedOrderCount + trendBuckets.buckets[chartHoverIndex].pendingOrderCount} 笔订单
+                      </div>
+                      <div className="crm-dashboard-chart-tooltip-row">
+                        <span className="is-completed-dot"></span>
+                        <span>已完成 {trendBuckets.buckets[chartHoverIndex].completedOrderCount} 笔</span>
+                      </div>
+                      <div className="crm-dashboard-chart-tooltip-row">
+                        <span className="is-pending-dot"></span>
+                        <span>未完成 {trendBuckets.buckets[chartHoverIndex].pendingOrderCount} 笔</span>
+                      </div>
                       <div className="crm-dashboard-chart-tooltip-row">
                         <span className="is-follow-dot"></span>
-                        <span>{trendBuckets.followValues[chartHoverIndex]} 跟进</span>
+                        <span>{trendBuckets.buckets[chartHoverIndex].followCount} 次跟进</span>
                       </div>
-                      <div className="crm-dashboard-chart-tooltip-row">
-                        <span className="is-order-dot"></span>
-                        <span>{trendBuckets.orderValues[chartHoverIndex]} 下单</span>
-                      </div>
+                      <div className="crm-dashboard-chart-tooltip-note">主推产品 {trendBuckets.buckets[chartHoverIndex].topProductName}</div>
                     </>
                   )}
-                </div>
-              </div>
-
-              <div className="crm-dashboard-structure-grid">
-                <div className="crm-dashboard-structure-card">
-                  <span>A级客户贡献</span>
-                  <strong>{formatPercent(keyContribution)}</strong>
-                  <small>按当前客户近一年金额占比估算</small>
-                </div>
-                <div className="crm-dashboard-structure-card">
-                  <span>Top1 客户集中度</span>
-                  <strong>{formatPercent(topOneConcentration)}</strong>
-                  <small>判断是否过度依赖单一客户</small>
-                </div>
-                <div className="crm-dashboard-structure-card">
-                  <span>跟进覆盖率</span>
-                  <strong>{formatPercent(followCoverage)}</strong>
-                  <small>最近 7 天有动作的客户占比</small>
-                </div>
-                <div className="crm-dashboard-structure-card">
-                  <span>风险暴露率</span>
-                  <strong>{formatPercent(riskExposure)}</strong>
-                  <small>当前处于风险态的客户占比</small>
                 </div>
               </div>
 

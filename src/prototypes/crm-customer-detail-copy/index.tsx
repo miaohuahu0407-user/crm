@@ -1,22 +1,26 @@
 /**
- * @name CRM 客户详情页1.0
+ * @name CRM 客户详情页2
  *
  * 参考资料：
  * - /rules/development-guide.md
  * - /src/prototypes/crm-customer-detail/spec.md
  * - /src/database/orders.json
+ * - /src/database/product_specs.json
  */
 
 import './style.css';
 
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
+import { DatePicker } from 'antd';
+import dayjs from 'dayjs';
 import {
   ArrowLeft,
   Bell,
   Boxes,
-  ChevronLeft,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clock3,
   FileText,
   LayoutDashboard,
@@ -35,6 +39,7 @@ import {
 } from 'lucide-react';
 
 import ordersDb from '../../database/orders.json';
+import productSpecsDb from '../../database/product_specs.json';
 import type {
   Action,
   AxureHandle,
@@ -88,6 +93,8 @@ type TaskStatus = '未开始' | '进行中' | '有风险' | '已完成';
 type TaskType = '新品推送' | '订单跟进' | '预售打板' | '客情维护' | '其他';
 type TaskPriority = '高' | '中' | '低';
 type AttachmentPreviewMode = 'warm' | 'cool' | 'neutral';
+type TaskListFilter = 'all' | '进行中' | '有风险' | '已完成';
+type TaskPrioritySortDirection = 'desc' | 'asc';
 
 type GoalTarget = {
   id: string;
@@ -155,14 +162,13 @@ type OrderRecord = {
   orderStatus: string;
 };
 
-type GoalTimelineEntry =
+type TaskTimelineEntry =
   | {
       id: string;
       type: 'progress';
       happenedAt: string;
       title: string;
       submittedBy: string;
-      progressPercent: number;
       status: TaskStatus;
       content: string;
       attachments: ProgressAttachment[];
@@ -179,13 +185,15 @@ type GoalTimelineEntry =
       order: OrderRecord;
     };
 
-type GoalFilter = '全部' | GoalStatus;
-
 type MonthlyAnalysisPoint = {
   monthKey: string;
   label: string;
   orderAmount: number;
   orderCount: number;
+  completedOrderAmount: number;
+  pendingOrderAmount: number;
+  completedOrderCount: number;
+  pendingOrderCount: number;
   followUpCount: number;
   productSummary: string;
 };
@@ -199,11 +207,23 @@ type GoalConversionStep = {
   tone: GoalConversionStepTone;
 };
 
-type OrderStatusBreakdownItem = {
-  key: 'pending-pack' | 'pending-ship' | 'completed' | 'other';
+type ProductSpecRecord = {
+  productName: string;
+  styleCode: string;
+  platingColor: string;
+  colorName: string;
+};
+
+type PurchaseStructureDimension = 'platingColor' | 'colorName' | 'styleCode';
+
+type PurchaseStructureItem = {
+  key: string;
   label: string;
-  count: number;
+  orderCount: number;
+  productCount: number;
+  quantity: number;
   amount: number;
+  share: number;
 };
 
 type GoalFormState = {
@@ -229,7 +249,6 @@ type TaskFormState = {
 
 type ProgressFormState = {
   submittedBy: string;
-  progressPercent: string;
   status: TaskStatus;
   content: string;
   attachmentPresetIds: string[];
@@ -286,16 +305,21 @@ type ContactFormState = {
 };
 
 const TODAY = '2026-04-23';
-const GOAL_RAIL_VISIBLE_COUNT = 2;
-const GOAL_FILTER_OPTIONS: GoalFilter[] = ['全部', '进行中', '有风险', '已完成'];
 const ANALYSIS_MONTH_COUNT = 6;
+const PURCHASE_STRUCTURE_TOP_LIMIT = 10;
+const PURCHASE_STRUCTURE_DIMENSIONS: Array<{ key: PurchaseStructureDimension; label: string }> = [
+  { key: 'platingColor', label: '电镀色' },
+  { key: 'colorName', label: '颜色' },
+  { key: 'styleCode', label: '款式' },
+];
+const DEFAULT_PRODUCT_SPECS = getRawList(productSpecsDb).map(normalizeProductSpecRecord);
 
 const EVENT_LIST: EventItem[] = [
   { name: 'on_back_to_list', desc: '点击返回列表按钮时触发' },
   { name: 'on_create_goal', desc: '创建业绩目标时触发' },
   { name: 'on_select_goal', desc: '切换业绩目标时触发' },
   { name: 'on_create_task', desc: '创建目标任务时触发' },
-  { name: 'on_select_task', desc: '打开任务详情抽屉时触发' },
+  { name: 'on_select_task', desc: '切换当前任务时触发' },
   { name: 'on_submit_task_progress', desc: '提交任务进度时触发' },
   { name: 'on_link_task_orders', desc: '绑定或取消绑定任务订单时触发' },
   { name: 'on_open_shipping_addresses', desc: '打开客户收货地址列表时触发' },
@@ -314,7 +338,7 @@ const ACTION_LIST: Action[] = [];
 const VAR_LIST: KeyDesc[] = [
   { name: 'current_customer_id', desc: '当前详情页客户编号' },
   { name: 'selected_goal_id', desc: '当前选中的目标编号' },
-  { name: 'selected_task_id', desc: '当前打开的任务编号' },
+  { name: 'selected_task_id', desc: '当前选中的任务编号' },
   { name: 'selected_order_id', desc: '当前高亮的订单编号' },
   { name: 'open_task_count', desc: '当前客户未完成任务数' },
   { name: 'overdue_task_count', desc: '当前客户逾期任务数' },
@@ -391,6 +415,16 @@ const DATA_LIST: DataDesc[] = [
       { name: 'order_time', desc: '下单时间' },
       { name: 'order_amount', desc: '订单金额' },
       { name: 'order_status', desc: '订单状态' },
+    ],
+  },
+  {
+    name: 'product_specs',
+    desc: '商品规格映射数据',
+    keys: [
+      { name: 'product_name', desc: '商品名称' },
+      { name: 'style_code', desc: '款式编码' },
+      { name: 'plating_color', desc: '电镀色' },
+      { name: 'color_name', desc: '颜色' },
     ],
   },
   {
@@ -1497,7 +1531,18 @@ function buildMonthlyAnalysisPoints(
   const monthMap = new Map(
     monthKeys.map((monthKey) => [
       monthKey,
-      { monthKey, label: getMonthLabel(monthKey), orderAmount: 0, orderCount: 0, followUpCount: 0, productNames: [] as string[] },
+      {
+        monthKey,
+        label: getMonthLabel(monthKey),
+        orderAmount: 0,
+        orderCount: 0,
+        completedOrderAmount: 0,
+        pendingOrderAmount: 0,
+        completedOrderCount: 0,
+        pendingOrderCount: 0,
+        followUpCount: 0,
+        productNames: [] as string[],
+      },
     ]),
   );
 
@@ -1507,6 +1552,13 @@ function buildMonthlyAnalysisPoints(
     if (bucket) {
       bucket.orderAmount += order.orderAmount;
       bucket.orderCount += 1;
+      if (isCompletedOrderStatus(order.orderStatus)) {
+        bucket.completedOrderAmount += order.orderAmount;
+        bucket.completedOrderCount += 1;
+      } else {
+        bucket.pendingOrderAmount += order.orderAmount;
+        bucket.pendingOrderCount += 1;
+      }
       if (order.productName) {
         bucket.productNames.push(order.productName);
       }
@@ -1526,6 +1578,10 @@ function buildMonthlyAnalysisPoints(
     label: getMonthLabel(monthKey),
     orderAmount: 0,
     orderCount: 0,
+    completedOrderAmount: 0,
+    pendingOrderAmount: 0,
+    completedOrderCount: 0,
+    pendingOrderCount: 0,
     followUpCount: 0,
     productNames: [] as string[],
   }).map((item) => ({
@@ -1533,56 +1589,38 @@ function buildMonthlyAnalysisPoints(
     label: item.label,
     orderAmount: item.orderAmount,
     orderCount: item.orderCount,
+    completedOrderAmount: item.completedOrderAmount,
+    pendingOrderAmount: item.pendingOrderAmount,
+    completedOrderCount: item.completedOrderCount,
+    pendingOrderCount: item.pendingOrderCount,
     followUpCount: item.followUpCount,
     productSummary: summarizeProductNames(item.productNames),
   }));
 }
 
-function isWithinRecentDays(value: string, anchorTimestamp: number, days: number): boolean {
-  const timestamp = toTimestamp(value);
-  if (!timestamp || timestamp > anchorTimestamp) {
-    return false;
-  }
-  const diff = anchorTimestamp - timestamp;
-  return diff <= days * 24 * 60 * 60 * 1000;
-}
-
-function resolveOrderStatusGroup(status: string): OrderStatusBreakdownItem['key'] {
-  if (status === '待打包') {
-    return 'pending-pack';
-  }
-  if (status === '待发货') {
-    return 'pending-ship';
-  }
-  if (status === '已完成') {
-    return 'completed';
-  }
-  return 'other';
-}
-
-function buildOrderStatusBreakdown(orders: OrderRecord[]): OrderStatusBreakdownItem[] {
-  const breakdownMap = new Map<OrderStatusBreakdownItem['key'], OrderStatusBreakdownItem>([
-    ['pending-pack', { key: 'pending-pack', label: '待打包', count: 0, amount: 0 }],
-    ['pending-ship', { key: 'pending-ship', label: '待发货', count: 0, amount: 0 }],
-    ['completed', { key: 'completed', label: '已完成', count: 0, amount: 0 }],
-    ['other', { key: 'other', label: '其他状态', count: 0, amount: 0 }],
-  ]);
-
-  orders.forEach((order) => {
-    const key = resolveOrderStatusGroup(order.orderStatus);
-    const target = breakdownMap.get(key);
-    if (target) {
-      target.count += 1;
-      target.amount += order.orderAmount;
-    }
-  });
-
-  return Array.from(breakdownMap.values());
+function isCompletedOrderStatus(status: string): boolean {
+  return status === '已完成';
 }
 
 function formatDate(value: string): string {
   if (!value) {
     return '-';
+  }
+  return value.slice(0, 10);
+}
+
+function formatRecentPastDate(value: string): string {
+  if (!value) {
+    return '-';
+  }
+  const date = parseDateValue(value);
+  if (!date) {
+    return value.slice(0, 10) || '-';
+  }
+  const diffMs = new Date().getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays >= 0 && diffDays < 30) {
+    return diffDays === 0 ? '今天' : `${diffDays}天前`;
   }
   return value.slice(0, 10);
 }
@@ -1688,6 +1726,15 @@ function normalizeOrderRecord(raw: Record<string, unknown>): OrderRecord {
     address: String(raw.address || raw['收货地址'] || ''),
     paymentMethod: String(raw.payment_method || raw['支付方式'] || ''),
     orderStatus: String(raw.order_status || raw['订单状态'] || ''),
+  };
+}
+
+function normalizeProductSpecRecord(raw: Record<string, unknown>): ProductSpecRecord {
+  return {
+    productName: String(raw.product_name || raw.productName || raw['商品名称'] || ''),
+    styleCode: String(raw.style_code || raw.styleCode || raw['款式'] || ''),
+    platingColor: String(raw.plating_color || raw.platingColor || raw['电镀色'] || ''),
+    colorName: String(raw.color_name || raw.colorName || raw['颜色'] || ''),
   };
 }
 
@@ -1892,6 +1939,85 @@ function resolveCustomerOrders(source: unknown, customerId: string): OrderRecord
   return fallback.sort((left, right) => toTimestamp(right.orderTime) - toTimestamp(left.orderTime));
 }
 
+function resolveProductSpecs(source: unknown): ProductSpecRecord[] {
+  const sourceList = getRawList(source)
+    .map(normalizeProductSpecRecord)
+    .filter((item) => item.productName);
+  return sourceList.length > 0 ? sourceList : DEFAULT_PRODUCT_SPECS;
+}
+
+function getPurchaseStructureLabel(spec: ProductSpecRecord | undefined, dimension: PurchaseStructureDimension): string {
+  if (dimension === 'platingColor') {
+    return spec?.platingColor || '未标注电镀色';
+  }
+  if (dimension === 'colorName') {
+    return spec?.colorName || '未标注颜色';
+  }
+  return spec?.styleCode || '未标注款式';
+}
+
+function buildPurchaseStructureItems(
+  orders: OrderRecord[],
+  specs: ProductSpecRecord[],
+  dimension: PurchaseStructureDimension,
+): PurchaseStructureItem[] {
+  const totalAmount = orders.reduce((sum, item) => sum + item.orderAmount, 0);
+  const specMap = new Map(specs.map((item) => [item.productName, item] as const));
+  const bucketMap = new Map<
+    string,
+    {
+      key: string;
+      label: string;
+      orderCount: number;
+      quantity: number;
+      amount: number;
+      productNames: Set<string>;
+    }
+  >();
+
+  orders.forEach((order) => {
+    const label = getPurchaseStructureLabel(specMap.get(order.productName), dimension);
+    const key = `${dimension}-${label}`;
+    const current =
+      bucketMap.get(key) ||
+      {
+        key,
+        label,
+        orderCount: 0,
+        quantity: 0,
+        amount: 0,
+        productNames: new Set<string>(),
+      };
+
+    current.orderCount += 1;
+    current.quantity += order.quantity;
+    current.amount += order.orderAmount;
+    current.productNames.add(order.productName);
+    bucketMap.set(key, current);
+  });
+
+  return Array.from(bucketMap.values())
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      orderCount: item.orderCount,
+      productCount: item.productNames.size,
+      quantity: item.quantity,
+      amount: item.amount,
+      share: totalAmount > 0 ? item.amount / totalAmount : 0,
+    }))
+    .sort((left, right) => {
+      if (right.amount !== left.amount) {
+        return right.amount - left.amount;
+      }
+      if (right.orderCount !== left.orderCount) {
+        return right.orderCount - left.orderCount;
+      }
+      return left.label.localeCompare(right.label, 'zh-CN');
+    })
+    .slice(0, PURCHASE_STRUCTURE_TOP_LIMIT);
+}
+
 function resolveShippingAddresses(source: unknown, customerId: string, detail: DetailRecord): ShippingAddressRecord[] {
   const sourceList = getRawList(source).map((item) => normalizeShippingAddressRecord(item, customerId));
   const filtered = sourceList.filter((item) => item.customerId === customerId);
@@ -1983,6 +2109,13 @@ function getGoalTaskSummary(goal: GoalTarget, tasks: TaskItem[]): { headline: st
   };
 }
 
+function getGoalLinkedOrderCount(goal: GoalTarget, tasks: TaskItem[]): number {
+  return uniqueIds([
+    ...goal.linkedOrderIds,
+    ...tasks.filter((item) => item.goalId === goal.id).flatMap((item) => item.linkedOrderIds),
+  ]).length;
+}
+
 function getStatusClass(status: GoalStatus | TaskStatus): string {
   if (status === '已完成') {
     return 'is-done';
@@ -2004,6 +2137,16 @@ function getPriorityClass(priority: TaskPriority): string {
     return 'is-low';
   }
   return 'is-medium';
+}
+
+function getPriorityWeight(priority: TaskPriority): number {
+  if (priority === '高') {
+    return 3;
+  }
+  if (priority === '中') {
+    return 2;
+  }
+  return 1;
 }
 
 function getTaskLinkedOrderIds(task: TaskItem): string[] {
@@ -2038,7 +2181,6 @@ function createDefaultTaskForm(assignee: string): TaskFormState {
 function createDefaultProgressForm(operatorName: string): ProgressFormState {
   return {
     submittedBy: operatorName,
-    progressPercent: '60',
     status: '进行中',
     content: '',
     attachmentPresetIds: [],
@@ -2101,11 +2243,11 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
   const [goals, setGoals] = useState<GoalTarget[]>(initialGoals);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
   const [progressLogs, setProgressLogs] = useState<TaskProgressLog[]>(initialProgressLogs);
-  const [goalFilter, setGoalFilter] = useState<GoalFilter>('全部');
   const [selectedGoalId, setSelectedGoalId] = useState<string>(resolveDefaultGoalId(initialGoals));
-  const [selectedTaskId, setSelectedTaskId] = useState<string>('');
+  const [activeTaskId, setActiveTaskId] = useState<string>('');
   const [selectedOrderId, setSelectedOrderId] = useState<string>('');
   const [isGoalFormOpen, setIsGoalFormOpen] = useState(false);
+  const [isGoalListModalOpen, setIsGoalListModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'goal' | 'warehouse' | 'productCompare'>('goal');
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [isOrderOverviewModalOpen, setIsOrderOverviewModalOpen] = useState(false);
@@ -2128,16 +2270,20 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
   const [tagForm, setTagForm] = useState<TagFormState>(createDefaultTagForm());
   const [contacts, setContacts] = useState<ContactRecord[]>(initialContacts);
   const [contactForm, setContactForm] = useState<ContactFormState>(createDefaultContactForm());
-  const goalRailRef = React.useRef<HTMLDivElement | null>(null);
-  const [canScrollGoalsPrev, setCanScrollGoalsPrev] = useState(false);
-  const [canScrollGoalsNext, setCanScrollGoalsNext] = useState(false);
+  const [taskListFilter, setTaskListFilter] = useState<TaskListFilter>('all');
+  const [taskNameKeyword, setTaskNameKeyword] = useState('');
+  const [taskDueDateStart, setTaskDueDateStart] = useState('');
+  const [taskDueDateEnd, setTaskDueDateEnd] = useState('');
+  const [taskPrioritySortDirection, setTaskPrioritySortDirection] = useState<TaskPrioritySortDirection>('desc');
   const [timelineFilter, setTimelineFilter] = useState<'all' | 'progress' | 'order'>('all');
   const [hoveredAnalysisIndex, setHoveredAnalysisIndex] = useState<number | null>(null);
+  const [activePurchaseDimension, setActivePurchaseDimension] = useState<PurchaseStructureDimension>('platingColor');
 
   const customerOrders = useMemo(
     () => resolveCustomerOrders(dataSource.customer_orders, customerId),
     [dataSource.customer_orders, customerId],
   );
+  const productSpecs = useMemo(() => resolveProductSpecs(dataSource.product_specs), [dataSource.product_specs]);
 
   useEffect(() => {
     if (!goals.some((item) => item.id === selectedGoalId)) {
@@ -2147,10 +2293,14 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
 
   useEffect(() => {
     const scopedTaskIds = tasks.filter((item) => item.goalId === selectedGoalId).map((item) => item.id);
-    if (selectedTaskId && !scopedTaskIds.includes(selectedTaskId)) {
-      setSelectedTaskId('');
+    if (activeTaskId && !scopedTaskIds.includes(activeTaskId)) {
+      setActiveTaskId(scopedTaskIds[0] || '');
+      return;
     }
-  }, [tasks, selectedGoalId, selectedTaskId]);
+    if (!activeTaskId && scopedTaskIds[0]) {
+      setActiveTaskId(scopedTaskIds[0]);
+    }
+  }, [activeTaskId, tasks, selectedGoalId]);
 
   useEffect(() => {
     if (selectedOrderId && !customerOrders.some((item) => item.id === selectedOrderId)) {
@@ -2166,95 +2316,64 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     () => [...goals].sort((left, right) => toTimestamp(left.endDate) - toTimestamp(right.endDate)),
     [goals],
   );
-  const goalFilterCounts = useMemo<Record<GoalFilter, number>>(
-    () =>
-      sortedGoals.reduce(
-        (counts, goal) => {
-          counts.全部 += 1;
-          counts[goal.status] += 1;
-          return counts;
-        },
-        { 全部: 0, 进行中: 0, 有风险: 0, 已完成: 0 },
-      ),
-    [sortedGoals],
-  );
-
-  const filteredGoals = useMemo(
-    () => (goalFilter === '全部' ? sortedGoals : sortedGoals.filter((item) => item.status === goalFilter)),
-    [goalFilter, sortedGoals],
-  );
-  const showGoalRailControls = filteredGoals.length > GOAL_RAIL_VISIBLE_COUNT;
 
   const selectedGoal = useMemo(
     () => goals.find((item) => item.id === selectedGoalId) || goals[0],
     [goals, selectedGoalId],
   );
 
-  useEffect(() => {
-    const rail = goalRailRef.current;
-    if (!rail) {
-      setCanScrollGoalsPrev(false);
-      setCanScrollGoalsNext(false);
-      return;
-    }
-
-    const syncGoalRailState = () => {
-      const maxScrollLeft = Math.max(rail.scrollWidth - rail.clientWidth, 0);
-      setCanScrollGoalsPrev(rail.scrollLeft > 4);
-      setCanScrollGoalsNext(rail.scrollLeft < maxScrollLeft - 4);
-    };
-
-    syncGoalRailState();
-    rail.addEventListener('scroll', syncGoalRailState, { passive: true });
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('resize', syncGoalRailState);
-    }
-
-    return () => {
-      rail.removeEventListener('scroll', syncGoalRailState);
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('resize', syncGoalRailState);
-      }
-    };
-  }, [filteredGoals.length]);
-
-  useEffect(() => {
-    const rail = goalRailRef.current;
-    if (!rail || !selectedGoal) {
-      return;
-    }
-
-    const activeCard = rail.querySelector<HTMLElement>(`[data-goal-id="${selectedGoal.id}"]`);
-    activeCard?.scrollIntoView({ behavior: showGoalRailControls ? 'smooth' : 'auto', block: 'nearest', inline: 'nearest' });
-  }, [selectedGoal?.id, goalFilter, showGoalRailControls]);
-
   const goalTasks = useMemo(
     () => tasks.filter((item) => item.goalId === selectedGoal?.id),
     [selectedGoal?.id, tasks],
   );
 
-  const goalTaskIds = useMemo(() => goalTasks.map((item) => item.id), [goalTasks]);
-
-  const selectedTask = useMemo(
-    () => tasks.find((item) => item.id === selectedTaskId),
-    [tasks, selectedTaskId],
+  const filteredGoalTasks = useMemo(
+    () => (taskListFilter === 'all' ? goalTasks : goalTasks.filter((item) => item.status === taskListFilter)),
+    [goalTasks, taskListFilter],
   );
 
-  const selectedTaskLogs = useMemo(
-    () =>
-      progressLogs
-        .filter((item) => item.taskId === selectedTaskId)
-        .sort((left, right) => toTimestamp(right.submittedAt) - toTimestamp(left.submittedAt)),
-    [progressLogs, selectedTaskId],
+  const visibleGoalTasks = useMemo(() => {
+    const normalizedKeyword = taskNameKeyword.trim().toLowerCase();
+    return [...filteredGoalTasks]
+      .filter((item) => {
+        const matchesKeyword = normalizedKeyword ? item.title.toLowerCase().includes(normalizedKeyword) : true;
+        const dueDateTimestamp = toTimestamp(item.dueDate);
+        const matchesStartDate = taskDueDateStart ? dueDateTimestamp >= toTimestamp(taskDueDateStart) : true;
+        const matchesEndDate = taskDueDateEnd ? dueDateTimestamp <= toTimestamp(taskDueDateEnd) : true;
+        return matchesKeyword && matchesStartDate && matchesEndDate;
+      })
+      .sort((left, right) => {
+        const priorityDiff =
+          taskPrioritySortDirection === 'desc'
+            ? getPriorityWeight(right.priority) - getPriorityWeight(left.priority)
+            : getPriorityWeight(left.priority) - getPriorityWeight(right.priority);
+        if (priorityDiff !== 0) {
+          return priorityDiff;
+        }
+        return 0;
+      });
+  }, [filteredGoalTasks, taskDueDateEnd, taskDueDateStart, taskNameKeyword, taskPrioritySortDirection]);
+
+  useEffect(() => {
+    if (visibleGoalTasks.length === 0) {
+      return;
+    }
+    if (!visibleGoalTasks.some((item) => item.id === activeTaskId)) {
+      setActiveTaskId(visibleGoalTasks[0].id);
+    }
+  }, [activeTaskId, visibleGoalTasks]);
+
+  const activeTask = useMemo(
+    () => tasks.find((item) => item.id === activeTaskId) || goalTasks[0],
+    [activeTaskId, goalTasks, tasks],
   );
 
-  const selectedGoalLogs = useMemo(
+  const activeTaskLogs = useMemo(
     () =>
       progressLogs
-        .filter((item) => goalTaskIds.includes(item.taskId))
+        .filter((item) => item.taskId === activeTask?.id)
         .sort((left, right) => toTimestamp(right.submittedAt) - toTimestamp(left.submittedAt)),
-    [goalTaskIds, progressLogs],
+    [activeTask?.id, progressLogs],
   );
 
   const selectedGoalLinkedOrderIds = useMemo(
@@ -2277,59 +2396,57 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     });
   }, [customerOrders, selectedGoalLinkedOrderIds]);
 
-  const selectedGoalOrders = useMemo(
-    () => orderedCustomerOrders.filter((order) => selectedGoalLinkedOrderIds.includes(order.id)),
-    [orderedCustomerOrders, selectedGoalLinkedOrderIds],
+  const activeTaskOrders = useMemo(
+    () => orderedCustomerOrders.filter((order) => activeTask?.linkedOrderIds.includes(order.id)),
+    [activeTask?.linkedOrderIds, orderedCustomerOrders],
   );
 
-  const selectedGoalOrderAmount = useMemo(
-    () => selectedGoalOrders.reduce((sum, order) => sum + order.orderAmount, 0),
-    [selectedGoalOrders],
+  const activeTaskOrderAmount = useMemo(
+    () => activeTaskOrders.reduce((sum, order) => sum + order.orderAmount, 0),
+    [activeTaskOrders],
   );
 
-  const selectedGoalPurchaseSummary = useMemo(
-    () => summarizePurchasedItems(selectedGoalOrders),
-    [selectedGoalOrders],
+  const activeTaskPurchaseSummary = useMemo(
+    () => summarizePurchasedItems(activeTaskOrders),
+    [activeTaskOrders],
   );
 
-  const selectedGoalTimelineEntries = useMemo<GoalTimelineEntry[]>(
+  const activeTaskTimelineEntries = useMemo<TaskTimelineEntry[]>(
     () =>
-      [
-        ...selectedGoalLogs.map((log) => {
-          const task = tasks.find((item) => item.id === log.taskId);
-          return {
-            id: log.id,
-            type: 'progress' as const,
-            happenedAt: log.submittedAt,
-            title: task?.title || '任务进度',
-            submittedBy: log.submittedBy,
-            progressPercent: log.progressPercent,
-            status: log.status,
-            content: log.content,
-            attachments: log.attachments,
-          };
-        }),
-        ...selectedGoalOrders.map((order) => ({
-          id: `order-${order.id}`,
-          type: 'order' as const,
-          happenedAt: order.orderTime,
-          title: `新增订单 · ${order.productName}`,
-          createdBy: getOrderCreatedBy(order, selectedGoal?.owner || detail.followUpBy),
-          orderAmount: order.orderAmount,
-          orderStatus: order.orderStatus,
-          content: `${getOrderCreatedBy(order, selectedGoal?.owner || detail.followUpBy)}创建订单，购买${buildOrderPurchaseSummary(order)}。`,
-          order,
-        })),
-      ].sort((left, right) => toTimestamp(right.happenedAt) - toTimestamp(left.happenedAt)),
-    [detail.followUpBy, selectedGoal?.owner, selectedGoalLogs, selectedGoalOrders, tasks],
+      activeTask
+        ? [
+            ...activeTaskLogs.map((log) => ({
+              id: log.id,
+              type: 'progress' as const,
+              happenedAt: log.submittedAt,
+              title: activeTask.title,
+              submittedBy: log.submittedBy,
+              status: log.status,
+              content: log.content,
+              attachments: log.attachments,
+            })),
+            ...activeTaskOrders.map((order) => ({
+              id: `order-${order.id}`,
+              type: 'order' as const,
+              happenedAt: order.orderTime,
+              title: `新增订单 · ${order.productName}`,
+              createdBy: getOrderCreatedBy(order, activeTask.assignee || selectedGoal?.owner || detail.followUpBy),
+              orderAmount: order.orderAmount,
+              orderStatus: order.orderStatus,
+              content: `${getOrderCreatedBy(order, activeTask.assignee || selectedGoal?.owner || detail.followUpBy)}创建订单，购买${buildOrderPurchaseSummary(order)}。`,
+              order,
+            })),
+          ].sort((left, right) => toTimestamp(right.happenedAt) - toTimestamp(left.happenedAt))
+        : [],
+    [activeTask, activeTaskLogs, activeTaskOrders, detail.followUpBy, selectedGoal?.owner],
   );
 
   const filteredTimelineEntries = useMemo(
     () =>
       timelineFilter === 'all'
-        ? selectedGoalTimelineEntries
-        : selectedGoalTimelineEntries.filter((entry) => entry.type === timelineFilter),
-    [selectedGoalTimelineEntries, timelineFilter],
+        ? activeTaskTimelineEntries
+        : activeTaskTimelineEntries.filter((entry) => entry.type === timelineFilter),
+    [activeTaskTimelineEntries, timelineFilter],
   );
 
   const analysisMonthKeys = useMemo(() => getRecentMonthKeys(TODAY, ANALYSIS_MONTH_COUNT), []);
@@ -2338,22 +2455,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     [analysisMonthKeys, customerOrders, progressLogs],
   );
   const analysisDateRange = `${analysisMonthKeys[0] || '-'} - ${analysisMonthKeys[analysisMonthKeys.length - 1] || '-'}`;
-  const analysisAnchorTimestamp = useMemo(() => toTimestamp(`${TODAY}T23:59:59`) || Date.now(), []);
   const analysisHasData = useMemo(
     () => analysisPoints.some((item) => item.orderAmount > 0 || item.followUpCount > 0),
     [analysisPoints],
-  );
-  const recent30DayOrderAmount = useMemo(
-    () =>
-      customerOrders.reduce(
-        (sum, order) => (isWithinRecentDays(order.orderTime, analysisAnchorTimestamp, 30) ? sum + order.orderAmount : sum),
-        0,
-      ),
-    [analysisAnchorTimestamp, customerOrders],
-  );
-  const recent30DayFollowUpCount = useMemo(
-    () => progressLogs.filter((log) => isWithinRecentDays(log.submittedAt, analysisAnchorTimestamp, 30)).length,
-    [analysisAnchorTimestamp, progressLogs],
   );
   const analysisOrderMax = useMemo(() => Math.max(...analysisPoints.map((item) => item.orderAmount), 1), [analysisPoints]);
   const analysisFollowUpMax = useMemo(
@@ -2409,6 +2513,10 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
       analysisPoints.map((point, index) => {
         const barWidth = Math.min(40, comboChartStep * 0.44);
         const barHeight = analysisOrderMax > 0 ? (point.orderAmount / analysisOrderMax) * comboChartHeight : 0;
+        const completedBarHeight =
+          analysisOrderMax > 0 ? (point.completedOrderAmount / analysisOrderMax) * comboChartHeight : 0;
+        const pendingBarHeight =
+          analysisOrderMax > 0 ? (point.pendingOrderAmount / analysisOrderMax) * comboChartHeight : 0;
         const x = comboChartLeft + comboChartStep * index + (comboChartStep - barWidth) / 2;
         const y = comboChartTop + comboChartHeight - barHeight;
         return {
@@ -2417,10 +2525,15 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
           y,
           barWidth,
           barHeight,
+          completedBarHeight,
+          pendingBarHeight,
+          completedY: comboChartBaseY - completedBarHeight,
+          pendingY: y,
           centerX: comboChartLeft + comboChartStep * index + comboChartStep / 2,
+          clipPathId: `crm-customer-detail-bar-clip-${point.monthKey}`,
         };
       }),
-    [analysisOrderMax, analysisPoints],
+    [analysisOrderMax, analysisPoints, comboChartBaseY],
   );
   const comboChartLineDots = useMemo(
     () =>
@@ -2462,11 +2575,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     }
   }, [analysisPoints.length, hoveredAnalysisIndex]);
 
-  const orderStatusBreakdown = useMemo(() => buildOrderStatusBreakdown(customerOrders), [customerOrders]);
-  const customerOrderSummary = useMemo(() => summarizePurchasedItems(customerOrders), [customerOrders]);
-  const orderStatusBreakdownTotal = useMemo(
-    () => orderStatusBreakdown.reduce((sum, item) => sum + item.count, 0),
-    [orderStatusBreakdown],
+  const purchaseStructureItems = useMemo(
+    () => buildPurchaseStructureItems(customerOrders, productSpecs, activePurchaseDimension),
+    [activePurchaseDimension, customerOrders, productSpecs],
   );
 
   const openTaskCount = tasks.filter((item) => item.status !== '已完成').length;
@@ -2486,6 +2597,18 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     ['创建时间', detail.createdAt],
     ['最近跟进时间', detail.lastFollowAt],
     ['最近下单时间', latestOrderAt],
+  ];
+
+  const selectedGoalTaskSummary = selectedGoal ? getGoalTaskSummary(selectedGoal, tasks) : null;
+  const goalTaskCount = goalTasks.length;
+  const goalTaskInProgressCount = goalTasks.filter((item) => item.status === '进行中').length;
+  const goalTaskRiskCount = goalTasks.filter((item) => item.status === '有风险').length;
+  const goalTaskDoneCount = goalTasks.filter((item) => item.status === '已完成').length;
+  const taskFilterOptions: Array<{ key: TaskListFilter; label: string; count: number }> = [
+    { key: 'all', label: '全部', count: goalTaskCount },
+    { key: '进行中', label: '进行中', count: goalTaskInProgressCount },
+    { key: '有风险', label: '有风险', count: goalTaskRiskCount },
+    { key: '已完成', label: '已完成', count: goalTaskDoneCount },
   ];
 
   const profileSummaryCards = [
@@ -2513,26 +2636,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
 
   function handleSelectGoal(goalId: string) {
     setSelectedGoalId(goalId);
-    setSelectedTaskId('');
     setSelectedOrderId('');
     setTimelineFilter('all');
     emitEvent('on_select_goal', { customer_id: detail.id, goal_id: goalId });
-  }
-
-  function handleGoalRailScroll(direction: 'prev' | 'next') {
-    const rail = goalRailRef.current;
-    if (!rail) {
-      return;
-    }
-
-    const gap = 12;
-    const firstCard = rail.querySelector<HTMLElement>('.crm-customer-detail-goal-card');
-    const cardWidth = firstCard?.getBoundingClientRect().width || (rail.clientWidth - gap) / GOAL_RAIL_VISIBLE_COUNT;
-    const step = (cardWidth + gap) * GOAL_RAIL_VISIBLE_COUNT;
-    rail.scrollBy({
-      left: direction === 'next' ? step : -step,
-      behavior: 'smooth',
-    });
   }
 
   function handleOpenTask(taskId: string) {
@@ -2543,14 +2649,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     if (task.goalId !== selectedGoalId) {
       setSelectedGoalId(task.goalId);
     }
-    setSelectedTaskId(taskId);
+    setActiveTaskId(taskId);
     emitEvent('on_select_task', { customer_id: detail.id, goal_id: task.goalId, task_id: taskId });
-  }
-
-  function closeTaskDrawer() {
-    setSelectedTaskId('');
-    setIsOrderBindModalOpen(false);
-    setIsProgressModalOpen(false);
   }
 
   function openOrderOverviewModal() {
@@ -2559,6 +2659,18 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
 
   function closeOrderOverviewModal() {
     setIsOrderOverviewModalOpen(false);
+  }
+
+  function openGoalListModal() {
+    setIsGoalListModalOpen(true);
+  }
+
+  function closeGoalListModal() {
+    setIsGoalListModalOpen(false);
+  }
+
+  function toggleTaskPrioritySortDirection() {
+    setTaskPrioritySortDirection((current) => (current === 'desc' ? 'asc' : 'desc'));
   }
 
   function openShippingAddressList() {
@@ -2764,7 +2876,17 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     setIsOrderBindModalOpen(false);
   }
 
+  function openOrderBindModal() {
+    if (!activeTask) {
+      return;
+    }
+    setIsOrderBindModalOpen(true);
+  }
+
   function openProgressModal() {
+    if (!activeTask) {
+      return;
+    }
     setProgressForm(createDefaultProgressForm(operatorName));
     setIsProgressModalOpen(true);
   }
@@ -2834,7 +2956,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     };
 
     setTasks((current) => [nextTask, ...current]);
-    setSelectedTaskId(nextTask.id);
+    setActiveTaskId(nextTask.id);
     setIsTaskFormOpen(false);
     setTaskForm(createDefaultTaskForm(detail.followUpBy));
     emitEvent('on_create_task', {
@@ -2857,7 +2979,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
 
   function handleSubmitProgress(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedTask) {
+    if (!activeTask) {
       return;
     }
 
@@ -2872,13 +2994,17 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
       }));
 
     const submittedAt = `${TODAY} ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`;
+    const inferredProgressPercent =
+      progressForm.status === '已完成'
+        ? 100
+        : activeTaskLogs[0]?.progressPercent || (activeTask.status === '已完成' ? 100 : 0);
     const nextLog: TaskProgressLog = {
       id: makeId('log'),
-      taskId: selectedTask.id,
+      taskId: activeTask.id,
       customerId: detail.id,
       submittedBy: progressForm.submittedBy || operatorName,
       submittedAt,
-      progressPercent: Number(progressForm.progressPercent || 0),
+      progressPercent: inferredProgressPercent,
       content: progressForm.content || '已提交新进度',
       status: progressForm.status,
       attachments: attachmentItems,
@@ -2887,15 +3013,10 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     setProgressLogs((current) => [nextLog, ...current]);
     setTasks((current) =>
       current.map((item) =>
-        item.id === selectedTask.id
+        item.id === activeTask.id
           ? {
               ...item,
-              status:
-                Number(progressForm.progressPercent || 0) >= 100
-                  ? '已完成'
-                  : progressForm.status === '未开始'
-                    ? '进行中'
-                    : progressForm.status,
+              status: progressForm.status === '未开始' ? '进行中' : progressForm.status,
               latestProgressAt: submittedAt,
             }
           : item,
@@ -2908,26 +3029,26 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
     closeProgressModal();
     emitEvent('on_submit_task_progress', {
       customer_id: detail.id,
-      task_id: selectedTask.id,
-      goal_id: selectedTask.goalId,
+      task_id: activeTask.id,
+      goal_id: activeTask.goalId,
       submitted_at: submittedAt,
-      progress_percent: Number(progressForm.progressPercent || 0),
+      progress_percent: inferredProgressPercent,
     });
   }
 
   function toggleTaskOrderBinding(orderId: string) {
-    if (!selectedTask) {
+    if (!activeTask) {
       return;
     }
 
-    const isLinked = selectedTask.linkedOrderIds.includes(orderId);
+    const isLinked = activeTask.linkedOrderIds.includes(orderId);
     const nextOrderIds = isLinked
-      ? selectedTask.linkedOrderIds.filter((item) => item !== orderId)
-      : [...selectedTask.linkedOrderIds, orderId];
+      ? activeTask.linkedOrderIds.filter((item) => item !== orderId)
+      : [...activeTask.linkedOrderIds, orderId];
 
     setTasks((current) =>
       current.map((item) =>
-        item.id === selectedTask.id
+        item.id === activeTask.id
           ? {
               ...item,
               linkedOrderIds: uniqueIds(nextOrderIds),
@@ -2938,8 +3059,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
 
     emitEvent('on_link_task_orders', {
       customer_id: detail.id,
-      goal_id: selectedTask.goalId,
-      task_id: selectedTask.id,
+      goal_id: activeTask.goalId,
+      task_id: activeTask.id,
       order_id: orderId,
       linked: !isLinked,
     });
@@ -2952,7 +3073,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
         const vars: Record<string, unknown> = {
           current_customer_id: detail.id,
           selected_goal_id: selectedGoal?.id || '',
-          selected_task_id: selectedTask?.id || '',
+          selected_task_id: activeTask?.id || '',
           selected_order_id: selectedOrderId,
           open_task_count: openTaskCount,
           overdue_task_count: overdueTaskCount,
@@ -2975,9 +3096,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
       detail.tags.length,
       openTaskCount,
       overdueTaskCount,
+      activeTask?.id,
       selectedGoal?.id,
       selectedOrderId,
-      selectedTask?.id,
       shippingAddresses.length,
     ],
   );
@@ -3100,6 +3221,54 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
               </button>
             </div>
 
+            <div className="crm-customer-detail-profile-goals">
+              <div className="crm-customer-detail-profile-section-head">
+                <div className="crm-customer-detail-profile-tags-title">业绩目标</div>
+                {sortedGoals.length > 0 ? (
+                  <button className="crm-customer-detail-profile-goal-entry" type="button" onClick={openGoalListModal}>
+                    查看全部
+                    <ChevronRight size={14} />
+                  </button>
+                ) : null}
+              </div>
+              <div className="crm-customer-detail-profile-goal-list">
+                {selectedGoal && selectedGoalTaskSummary ? (
+                  <div className="crm-customer-detail-profile-goal-card is-selected is-static">
+                    <div className="crm-customer-detail-profile-goal-top">
+                      <strong>{selectedGoal.title}</strong>
+                      <span className={`crm-customer-detail-status-badge ${getStatusClass(selectedGoal.status)}`}>
+                        {selectedGoal.status}
+                      </span>
+                    </div>
+                    <div className="crm-customer-detail-profile-goal-meta">
+                      <span>{selectedGoalTaskSummary.headline}</span>
+                      {selectedGoalTaskSummary.progressText ? (
+                        <span>{selectedGoalTaskSummary.progressText}</span>
+                      ) : (
+                        <span>负责人：{selectedGoal.owner}</span>
+                      )}
+                    </div>
+                    {selectedGoalTaskSummary.progressText ? (
+                      <div
+                        aria-label={`业绩达成进度 ${selectedGoalTaskSummary.percent}%`}
+                        className="crm-customer-detail-profile-goal-progress"
+                      >
+                        <div className="crm-customer-detail-profile-goal-progress-head">
+                          <span>业绩达成</span>
+                          <strong>{selectedGoalTaskSummary.percent}%</strong>
+                        </div>
+                        <div className="crm-customer-detail-profile-goal-progress-track" aria-hidden="true">
+                          <span style={{ width: `${selectedGoalTaskSummary.percent}%` }} />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="crm-customer-detail-empty-card">当前客户暂无目标。</div>
+                )}
+              </div>
+            </div>
+
             <div className="crm-customer-detail-profile-tags">
               <div className="crm-customer-detail-profile-tags-title">标签</div>
               <button className="crm-customer-detail-tag-add-button" type="button" onClick={openTagForm}>
@@ -3164,18 +3333,6 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                   产品信息对照表
                 </button>
               </div>
-              {activeTab === 'goal' && (
-                <div className="crm-customer-detail-workspace-actions">
-                  <button
-                    className="crm-customer-detail-secondary-button"
-                    type="button"
-                    onClick={() => setIsGoalFormOpen(true)}
-                  >
-                    <Plus size={12} />
-                    新建目标
-                  </button>
-                </div>
-              )}
             </div>
 
             <div className="crm-customer-detail-workspace">
@@ -3187,108 +3344,57 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                         <div>
                           <div className="crm-customer-detail-section-title">
                             <span className="crm-customer-detail-section-bar" />
-                            <span>业绩目标</span>
-                          </div>
-                        </div>
-                        <div className="crm-customer-detail-goal-toolbar">
-                          <div className="crm-customer-detail-filter-group">
-                            {GOAL_FILTER_OPTIONS.map((item) => (
-                              <button
-                                className={`crm-customer-detail-filter-pill${goalFilter === item ? ' is-active' : ''}`}
-                                key={item}
-                                type="button"
-                                onClick={() => setGoalFilter(item)}
-                              >
-                                {`${item}（${goalFilterCounts[item]}）`}
-                              </button>
-                            ))}
+                            <span>任务执行</span>
                           </div>
                         </div>
                       </div>
-
-                      <div className="crm-customer-detail-goal-carousel">
-                        <div
-                          className={`crm-customer-detail-goal-rail${showGoalRailControls ? ' is-scrollable' : ''}`}
-                          ref={goalRailRef}
-                        >
-                      {filteredGoals.length > 0 ? (
-                        filteredGoals.map((goal) => {
-                          const summary = getGoalTaskSummary(goal, tasks);
-                          const linkedOrderCount = uniqueIds([
-                            ...goal.linkedOrderIds,
-                            ...tasks.filter((item) => item.goalId === goal.id).flatMap((item) => item.linkedOrderIds),
-                          ]).length;
-                          const goalTaskStatus = tasks
-                            .filter((item) => item.goalId === goal.id)
-                            .sort((a, b) => toTimestamp(b.latestProgressAt) - toTimestamp(a.latestProgressAt))[0]
-                            ?.status || goal.status;
-                          return (
-                            <button
-                              className={`crm-customer-detail-goal-card${selectedGoal?.id === goal.id ? ' is-selected' : ''}`}
-                              data-goal-id={goal.id}
-                              key={goal.id}
-                              type="button"
-                              onClick={() => handleSelectGoal(goal.id)}
-                            >
-                              <div className="crm-customer-detail-goal-top">
-                                <span className={`crm-customer-detail-status-badge ${getStatusClass(goalTaskStatus)}`}>
-                                  {goalTaskStatus}
-                                </span>
-                              </div>
-                              <strong>{goal.title}</strong>
-                              <p>{goal.summary}</p>
-                              <div className="crm-customer-detail-goal-metric">
-                                <span>{summary.headline}</span>
-                                {summary.progressText ? <span>{summary.progressText}</span> : null}
-                              </div>
-                              <div className="crm-customer-detail-progress-track">
-                                <span style={{ width: `${summary.percent}%` }} />
-                              </div>
-                              <div className="crm-customer-detail-goal-meta">
-                                <span>负责人：{goal.owner}</span>
-                                <span>截止：{goal.endDate}</span>
-                                <span>关联订单：{linkedOrderCount}</span>
-                              </div>
-                            </button>
-                          );
-                        })
-                      ) : (
-                        <div className="crm-customer-detail-empty-card">当前筛选条件下暂无目标，可直接新建目标。</div>
-                      )}
-                    </div>
-                    {showGoalRailControls && canScrollGoalsPrev ? (
-                      <button
-                        className="crm-customer-detail-goal-carousel-button is-left"
-                        type="button"
-                        aria-label="查看上一组目标"
-                        onClick={() => handleGoalRailScroll('prev')}
-                      >
-                        <ChevronLeft size={18} />
-                      </button>
-                    ) : null}
-                    {showGoalRailControls && canScrollGoalsNext ? (
-                      <button
-                        className="crm-customer-detail-goal-carousel-button is-right"
-                        type="button"
-                        aria-label="查看下一组目标"
-                        onClick={() => handleGoalRailScroll('next')}
-                      >
-                        <ChevronRight size={18} />
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="crm-customer-detail-goal-task-section">
+                      <div className="crm-customer-detail-goal-task-section is-standalone">
                   <div className="crm-customer-detail-panel-header">
                     <div>
                       <div className="crm-customer-detail-section-title">
                         <span className="crm-customer-detail-section-bar" />
-                        <span>目标下任务</span>
                       </div>
                                           </div>
-                    <div className="crm-customer-detail-panel-summary">
-                      <span>任务数 {goalTasks.length}</span>
-                      <span>进行中 {goalTasks.filter((item) => item.status === '进行中').length}</span>
-                      <span>风险 {goalTasks.filter((item) => item.status === '有风险').length}</span>
+                    <div className="crm-customer-detail-task-filter-toolbar">
+                      <div className="crm-customer-detail-filter-group">
+                        {taskFilterOptions.map((option) => (
+                          <button
+                            key={option.key}
+                            className={`crm-customer-detail-filter-pill${taskListFilter === option.key ? ' is-active' : ''}`}
+                            type="button"
+                            onClick={() => setTaskListFilter(option.key)}
+                          >
+                            {option.label}（{option.count}）
+                          </button>
+                        ))}
+                      </div>
+                      <div className="crm-customer-detail-task-search-tools">
+                        <label className="crm-customer-detail-task-search-field">
+                          <Search size={14} />
+                          <input
+                            type="text"
+                            value={taskNameKeyword}
+                            onChange={(event) => setTaskNameKeyword(event.target.value)}
+                            placeholder="搜索任务名称"
+                          />
+                        </label>
+                        <div className="crm-customer-detail-task-date-filter">
+                          <span>目标日期</span>
+                          <DatePicker.RangePicker
+                            allowClear
+                            format="YYYY-MM-DD"
+                            placeholder={['开始时间', '结束时间']}
+                            value={[
+                              taskDueDateStart ? dayjs(taskDueDateStart) : null,
+                              taskDueDateEnd ? dayjs(taskDueDateEnd) : null,
+                            ]}
+                            onChange={(_dates, dateStrings) => {
+                              setTaskDueDateStart(dateStrings[0] || '');
+                              setTaskDueDateEnd(dateStrings[1] || '');
+                            }}
+                          />
+                        </div>
+                      </div>
                       <button
                         className="crm-customer-detail-primary-button"
                         type="button"
@@ -3311,7 +3417,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                         role="dialog"
                       >
                         <div className="crm-customer-detail-modal-header">
-                          <h3 id="crm-customer-detail-task-modal-title">新建目标下任务</h3>
+                          <h3 id="crm-customer-detail-task-modal-title">新建任务</h3>
                           <button
                             aria-label="关闭新建任务弹窗"
                             className="crm-customer-detail-icon-button"
@@ -3404,20 +3510,27 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                     <div className="crm-customer-detail-task-head">
                       <span>任务名称</span>
                       <span>状态</span>
-                      <span>优先级</span>
+                      <button
+                        className="crm-customer-detail-task-sort-button"
+                        type="button"
+                        onClick={toggleTaskPrioritySortDirection}
+                      >
+                        <span>优先级</span>
+                        {taskPrioritySortDirection === 'desc' ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                      </button>
                       <span>指定人</span>
                       <span>目标日期</span>
                       <span>关联订单</span>
                       <span>最近更新</span>
                       <span>操作</span>
                     </div>
-                    {goalTasks.length > 0 ? (
-                      goalTasks.map((task) => {
+                    {visibleGoalTasks.length > 0 ? (
+                      visibleGoalTasks.map((task) => {
                         const latestLog = getTaskLatestLog(progressLogs, task.id);
                         const isOrderRelated = selectedOrderId ? task.linkedOrderIds.includes(selectedOrderId) : false;
                         return (
                           <div
-                            className={`crm-customer-detail-task-row${selectedTask?.id === task.id ? ' is-selected' : ''}${
+                            className={`crm-customer-detail-task-row${activeTask?.id === task.id ? ' is-selected' : ''}${
                               isOrderRelated ? ' is-linked' : ''
                             }`}
                             key={task.id}
@@ -3435,7 +3548,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                             <span>{task.assignee}</span>
                             <span>
                               {isTaskOverdue(task) && <span className="crm-customer-detail-overdue-label">逾期</span>}
-                              {task.dueDate}
+                              {formatRecentPastDate(task.dueDate)}
                             </span>
                             <span>{getTaskLinkedOrderIds(task).length}</span>
                             <span>{latestLog ? formatDate(latestLog.submittedAt) : '-'}</span>
@@ -3448,7 +3561,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                         );
                       })
                     ) : (
-                      <div className="crm-customer-detail-empty-row">当前目标下暂无任务，可直接新建任务。</div>
+                      <div className="crm-customer-detail-empty-row">
+                        {goalTasks.length > 0 ? '当前筛选下暂无任务。' : '当前目标下暂无任务，可直接新建任务。'}
+                      </div>
                     )}
                   </div>
                   </div>
@@ -3459,27 +3574,29 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                 <section className="crm-customer-detail-panel crm-customer-detail-timeline-panel">
                   <div className="crm-customer-detail-panel-header crm-customer-detail-timeline-header">
                     <div className="crm-customer-detail-timeline-header-top">
-                      <strong className="crm-customer-detail-timeline-summary-title">目标跟进总结</strong>
+                      <strong className="crm-customer-detail-timeline-summary-title">
+                        {activeTask?.title || '当前目标下暂无任务'}
+                      </strong>
                       <div className="crm-customer-detail-panel-summary crm-customer-detail-panel-summary-inline">
                         <button
                           className={`crm-customer-detail-timeline-filter-chip${timelineFilter === 'progress' ? ' is-active' : ''}`}
                           type="button"
                           onClick={() => setTimelineFilter((prev) => (prev === 'progress' ? 'all' : 'progress'))}
                         >
-                          跟进次数 {selectedGoalLogs.length}
+                          跟进次数 {activeTaskLogs.length}
                         </button>
                         <button
                           className={`crm-customer-detail-timeline-filter-chip${timelineFilter === 'order' ? ' is-active' : ''}`}
                           type="button"
                           onClick={() => setTimelineFilter((prev) => (prev === 'order' ? 'all' : 'order'))}
                         >
-                          下单笔数 {selectedGoalOrders.length}
+                          下单笔数 {activeTaskOrders.length}
                         </button>
                       </div>
                     </div>
                     <div className="crm-customer-detail-timeline-summary-meta">
-                      <span>订单金额：{formatCurrency(selectedGoalOrderAmount)}</span>
-                      <span>主要购买：{selectedGoalPurchaseSummary}</span>
+                      <span>订单金额：{formatCurrency(activeTaskOrderAmount)}</span>
+                      <span>主要购买：{activeTaskPurchaseSummary}</span>
                     </div>
                   </div>
                   <div className="crm-customer-detail-timeline-layout">
@@ -3489,17 +3606,17 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                           <article className={`crm-customer-detail-timeline-item is-${entry.type}`} key={entry.id}>
                             <div className={`crm-customer-detail-timeline-dot is-${entry.type}`} />
                             <div className="crm-customer-detail-timeline-content">
-                              <div className="crm-customer-detail-timeline-head">
-                                <strong>{entry.title}</strong>
-                                <span>{formatRelativeTime(entry.happenedAt)}</span>
-                              </div>
                               {entry.type === 'progress' ? (
                                 <>
-                                  <div className="crm-customer-detail-timeline-meta">
-                                    <span>{entry.submittedBy}</span>
-                                    <span>{entry.progressPercent}%</span>
-                                    <span className={`crm-customer-detail-status-badge ${getStatusClass(entry.status)}`}>
-                                      {entry.status}
+                                  <div className="crm-customer-detail-timeline-head">
+                                    <div className="crm-customer-detail-timeline-meta crm-customer-detail-timeline-meta-group">
+                                      <span>{entry.submittedBy}</span>
+                                      <span className={`crm-customer-detail-status-badge ${getStatusClass(entry.status)}`}>
+                                        {entry.status}
+                                      </span>
+                                    </div>
+                                    <span className="crm-customer-detail-timeline-time">
+                                      {formatRelativeTime(entry.happenedAt)}
                                     </span>
                                   </div>
                                   <p>{entry.content}</p>
@@ -3519,10 +3636,15 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                                 </>
                               ) : (
                                 <>
-                                  <div className="crm-customer-detail-timeline-meta">
-                                    <span>创建人：{entry.createdBy}</span>
-                                    <span>金额：{formatCurrency(entry.orderAmount)}</span>
-                                    <span>{entry.orderStatus}</span>
+                                  <div className="crm-customer-detail-timeline-head">
+                                    <div className="crm-customer-detail-timeline-meta crm-customer-detail-timeline-meta-group">
+                                      <span>创建人：{entry.createdBy}</span>
+                                      <span>金额：{formatCurrency(entry.orderAmount)}</span>
+                                      <span>{entry.orderStatus}</span>
+                                    </div>
+                                    <span className="crm-customer-detail-timeline-time">
+                                      {formatRelativeTime(entry.happenedAt)}
+                                    </span>
                                   </div>
                                   <p>{entry.content}</p>
                                   <div className="crm-customer-detail-timeline-order-meta">
@@ -3535,9 +3657,21 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                           </article>
                         ))
                       ) : (
-                        <div className="crm-customer-detail-empty-card">当前目标下暂无进度和订单动态。</div>
+                        <div className="crm-customer-detail-empty-card">
+                          {activeTask ? '当前任务暂无进度和订单动态。' : '请先在当前目标下选择任务。'}
+                        </div>
                       )}
                     </div>
+                  </div>
+                  <div className="crm-customer-detail-timeline-footer">
+                    <button
+                      className="crm-customer-detail-primary-button"
+                      type="button"
+                      onClick={openProgressModal}
+                      disabled={!activeTask}
+                    >
+                      新增跟进
+                    </button>
                   </div>
                 </section>
               </aside>
@@ -3555,16 +3689,6 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                       <span>跟进-成交联动趋势</span>
                     </div>
                   </div>
-                  <div className="crm-customer-detail-chart-metrics">
-                    <div className="crm-customer-detail-chart-metric-card">
-                      <span>近 30 天订单金额</span>
-                      <strong>{formatCurrency(recent30DayOrderAmount)}</strong>
-                    </div>
-                    <div className="crm-customer-detail-chart-metric-card">
-                      <span>近 30 天跟进次数</span>
-                      <strong>{recent30DayFollowUpCount}</strong>
-                    </div>
-                  </div>
                   <div className="crm-customer-detail-date-range">
                     <span>{analysisDateRange}</span>
                   </div>
@@ -3572,7 +3696,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                 {analysisHasData ? (
                   <>
                     <div className="crm-customer-detail-chart-legend">
-                      <span className="is-order-amount">订单金额</span>
+                      <span className="is-order-completed">已完成订单</span>
+                      <span className="is-order-pending">未完成订单</span>
                       <span className="is-follow-up">跟进次数</span>
                     </div>
                     <div className="crm-customer-detail-chart-stage">
@@ -3586,6 +3711,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                             <strong>{formatCurrency(activeAnalysisPoint.orderAmount)}</strong>
                             <div className="crm-customer-detail-analysis-tooltip-meta">
                               <span>{activeAnalysisPoint.orderCount} 笔订单</span>
+                              <span>已完成 {activeAnalysisPoint.completedOrderCount} 笔</span>
+                              <span>未完成 {activeAnalysisPoint.pendingOrderCount} 笔</span>
                               <span>{activeAnalysisPoint.followUpCount} 次跟进</span>
                             </div>
                             <small>{activeAnalysisPoint.productSummary}</small>
@@ -3593,9 +3720,13 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                         ) : null}
                         <svg className="crm-customer-detail-combo-chart" viewBox="0 0 720 280" aria-hidden="true">
                           <defs>
-                            <linearGradient id="crm-customer-detail-order-gradient" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#a7d5ff" />
-                              <stop offset="100%" stopColor="#2d79ff" />
+                            <linearGradient id="crm-customer-detail-order-completed-gradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#97ddb0" />
+                              <stop offset="100%" stopColor="#4fb36d" />
+                            </linearGradient>
+                            <linearGradient id="crm-customer-detail-order-pending-gradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#ffd89a" />
+                              <stop offset="100%" stopColor="#f3a63b" />
                             </linearGradient>
                             <linearGradient id="crm-customer-detail-follow-gradient" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor="rgba(45,121,255,0.22)" />
@@ -3628,7 +3759,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                                 y={comboChartTop}
                                 width={Math.max(comboChartStep - 8, 16)}
                                 height={comboChartHeight}
-                                rx="18"
+                                rx="14"
                                 className="crm-customer-detail-chart-highlight"
                               />
                               <line
@@ -3643,14 +3774,44 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                           {comboChartAreaPath ? <path d={comboChartAreaPath} className="crm-customer-detail-line-area" /> : null}
                           {comboChartBars.map((point, index) => (
                             <g key={point.monthKey}>
-                              <rect
-                                x={point.x}
-                                y={point.y}
-                                width={point.barWidth}
-                                height={point.barHeight}
-                                rx="12"
-                                className={`crm-customer-detail-combo-bar${index === activeAnalysisIndex ? ' is-active' : ''}`}
-                              />
+                              {point.barHeight > 0 ? (
+                                <>
+                                  <defs>
+                                    <clipPath id={point.clipPathId}>
+                                      <rect x={point.x} y={point.y} width={point.barWidth} height={point.barHeight} rx="6" />
+                                    </clipPath>
+                                  </defs>
+                                  {point.pendingBarHeight > 0 ? (
+                                    <rect
+                                      x={point.x}
+                                      y={point.pendingY}
+                                      width={point.barWidth}
+                                      height={point.pendingBarHeight}
+                                      clipPath={`url(#${point.clipPathId})`}
+                                      className={`crm-customer-detail-combo-bar is-pending${index === activeAnalysisIndex ? ' is-active' : ''}`}
+                                    />
+                                  ) : null}
+                                  {point.completedBarHeight > 0 ? (
+                                    <rect
+                                      x={point.x}
+                                      y={point.completedY}
+                                      width={point.barWidth}
+                                      height={point.completedBarHeight}
+                                      clipPath={`url(#${point.clipPathId})`}
+                                      className={`crm-customer-detail-combo-bar is-completed${index === activeAnalysisIndex ? ' is-active' : ''}`}
+                                    />
+                                  ) : null}
+                                  {point.pendingBarHeight > 0 && point.completedBarHeight > 0 ? (
+                                    <line
+                                      x1={point.x + 3}
+                                      y1={point.completedY}
+                                      x2={point.x + point.barWidth - 3}
+                                      y2={point.completedY}
+                                      className="crm-customer-detail-combo-bar-divider"
+                                    />
+                                  ) : null}
+                                </>
+                              ) : null}
                               <text x={point.centerX} y="258" className="axis-text is-center">
                                 {point.label}
                               </text>
@@ -3705,45 +3866,53 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                     <div>
                       <div className="crm-customer-detail-section-title">
                         <span className="crm-customer-detail-section-bar" />
-                        <span>订单状态结构</span>
+                        <span>客户购买结构分析</span>
                       </div>
-                      <p>按当前客户全部订单聚合，快速判断成交活跃度和履约卡点。</p>
+                    </div>
+                    <div className="crm-customer-detail-tab-group crm-customer-detail-analysis-tab-group">
+                      {PURCHASE_STRUCTURE_DIMENSIONS.map((dimension) => (
+                        <button
+                          key={dimension.key}
+                          className={`crm-customer-detail-tab${activePurchaseDimension === dimension.key ? ' is-active' : ''}`}
+                          type="button"
+                          onClick={() => setActivePurchaseDimension(dimension.key)}
+                        >
+                          {dimension.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  {orderStatusBreakdownTotal > 0 ? (
+                  {purchaseStructureItems.length > 0 ? (
                     <>
-                      <div className="crm-customer-detail-status-strip">
-                        {orderStatusBreakdown
-                          .filter((item) => item.count > 0)
-                          .map((item) => (
-                            <span
-                              className={`crm-customer-detail-status-segment is-${item.key}`}
-                              key={item.key}
-                              style={{ width: `${(item.count / orderStatusBreakdownTotal) * 100}%` }}
-                            />
-                          ))}
-                      </div>
-                      <div className="crm-customer-detail-analysis-summary-grid">
-                        <div className="crm-customer-detail-analysis-summary-card is-wide">
-                          <span>主要购买商品</span>
-                          <strong>{customerOrderSummary}</strong>
-                        </div>
-                      </div>
-                      <div className="crm-customer-detail-order-status-list">
-                        {orderStatusBreakdown.map((item) => (
-                          <div className="crm-customer-detail-order-status-row" key={item.key}>
-                            <div className="crm-customer-detail-order-status-label">
-                              <span className={`crm-customer-detail-status-dot is-${item.key}`} />
-                              <strong>{item.label}</strong>
+                      <div className="crm-customer-detail-purchase-rank-list">
+                        {purchaseStructureItems.map((item, index) => (
+                          <div className="crm-customer-detail-purchase-rank-row" key={item.key}>
+                            <div className="crm-customer-detail-purchase-rank-main">
+                              <div className="crm-customer-detail-purchase-rank-title">
+                                <span className="crm-customer-detail-purchase-rank-index">
+                                  {String(index + 1).padStart(2, '0')}
+                                </span>
+                                <div>
+                                  <strong>{item.label}</strong>
+                                  <p>
+                                    {item.productCount} 款商品 · {item.orderCount} 单 · 占比 {Math.round(item.share * 100)}%
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="crm-customer-detail-purchase-rank-track" aria-hidden="true">
+                                <span style={{ width: `${Math.max(item.share * 100, 10)}%` }} />
+                              </div>
                             </div>
-                            <span>{item.count} 单</span>
-                            <span>{formatCurrency(item.amount)}</span>
+                            <span className="crm-customer-detail-purchase-rank-value">{item.quantity} 件</span>
+                            <span className="crm-customer-detail-purchase-rank-value is-amount">
+                              {formatCurrency(item.amount)}
+                            </span>
                           </div>
                         ))}
                       </div>
                     </>
                   ) : (
-                    <div className="crm-customer-detail-empty-card">当前客户暂无订单状态结构可分析。</div>
+                    <div className="crm-customer-detail-empty-card">当前客户暂无可用于购买结构分析的商品规格数据。</div>
                   )}
                 </article>
               </div>
@@ -3842,6 +4011,80 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                 </button>
               </div>
             </form>
+          </div>
+        </>
+      ) : null}
+
+      {isGoalListModalOpen ? (
+        <>
+          <div className="crm-customer-detail-overlay-mask" onClick={closeGoalListModal} aria-hidden="true" />
+          <div
+            aria-labelledby="crm-customer-detail-goal-list-title"
+            aria-modal="true"
+            className="crm-customer-detail-modal crm-customer-detail-overlay-modal crm-customer-detail-goal-list-modal"
+            role="dialog"
+          >
+            <div className="crm-customer-detail-modal-header">
+              <div>
+                <h3 id="crm-customer-detail-goal-list-title">全部业绩目标</h3>
+                <p className="crm-customer-detail-drawer-copy">查看并切换当前客户的全部业绩目标。</p>
+              </div>
+              <div className="crm-customer-detail-goal-modal-actions">
+                <button
+                  className="crm-customer-detail-primary-button"
+                  type="button"
+                  onClick={() => {
+                    closeGoalListModal();
+                    setIsGoalFormOpen(true);
+                  }}
+                >
+                  <Plus size={12} />
+                  新建目标
+                </button>
+                <button
+                  aria-label="关闭业绩目标列表"
+                  className="crm-customer-detail-icon-button"
+                  type="button"
+                  onClick={closeGoalListModal}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="crm-customer-detail-inline-form is-modal">
+              <div className="crm-customer-detail-profile-goal-list is-modal">
+                {sortedGoals.length > 0 ? (
+                  sortedGoals.map((goal) => {
+                    const goalSummary = getGoalTaskSummary(goal, tasks);
+                    const goalLinkedOrderCount = getGoalLinkedOrderCount(goal, tasks);
+                    return (
+                      <button
+                        className={`crm-customer-detail-profile-goal-card${selectedGoal?.id === goal.id ? ' is-selected' : ''}`}
+                        key={goal.id}
+                        type="button"
+                        onClick={() => {
+                          handleSelectGoal(goal.id);
+                          closeGoalListModal();
+                        }}
+                      >
+                        <div className="crm-customer-detail-profile-goal-top">
+                          <strong>{goal.title}</strong>
+                          <span className={`crm-customer-detail-status-badge ${getStatusClass(goal.status)}`}>{goal.status}</span>
+                        </div>
+                        <p>{goal.summary}</p>
+                        <div className="crm-customer-detail-profile-goal-meta">
+                          <span>{goalSummary.headline}</span>
+                          {goalSummary.progressText ? <span>{goalSummary.progressText}</span> : <span>负责人：{goal.owner}</span>}
+                          <span>关联订单：{goalLinkedOrderCount}</span>
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="crm-customer-detail-empty-card">当前客户暂无目标。</div>
+                )}
+              </div>
+            </div>
           </div>
         </>
       ) : null}
@@ -4327,180 +4570,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
         </>
       ) : null}
 
-      {selectedTask ? (
-        <div className="crm-customer-detail-drawer-mask" onClick={closeTaskDrawer} aria-hidden="true" />
-      ) : null}
-
-      {selectedTask ? (
-        <aside className="crm-customer-detail-drawer">
-          <div className="crm-customer-detail-drawer-header">
-            <div>
-              <h3>{selectedTask.title}</h3>
-            </div>
-            <button className="crm-customer-detail-ghost-button" type="button" onClick={closeTaskDrawer}>
-              收起
-            </button>
-          </div>
-          <div className="crm-customer-detail-drawer-body">
-            <section className="crm-customer-detail-drawer-section">
-              <div className="crm-customer-detail-detail-grid">
-                <div>
-                  <span>所属目标</span>
-                  <strong>{selectedGoal?.title || '-'}</strong>
-                </div>
-                <div>
-                  <span>指定人</span>
-                  <strong>{selectedTask.assignee}</strong>
-                </div>
-                <div>
-                  <span>目标日期</span>
-                  <strong>{selectedTask.dueDate}</strong>
-                </div>
-                <div>
-                  <span>任务状态</span>
-                  <strong>{selectedTask.status}</strong>
-                </div>
-                <div>
-                  <span>优先级</span>
-                  <strong>{selectedTask.priority}</strong>
-                </div>
-                <div>
-                  <span>关联订单</span>
-                  <strong>{selectedTask.linkedOrderIds.length}</strong>
-                </div>
-                <div>
-                  <span>最近更新</span>
-                  <strong>{selectedTask.latestProgressAt || '-'}</strong>
-                </div>
-                <div className="is-full">
-                  <span>任务说明</span>
-                  <strong>{selectedTask.description}</strong>
-                </div>
-              </div>
-            </section>
-
-            <section className="crm-customer-detail-drawer-section">
-              <div className="crm-customer-detail-section-title">
-                <span className="crm-customer-detail-section-bar" />
-                <span>关联订单</span>
-              </div>
-              <button
-                className="crm-customer-detail-drawer-link-card"
-                type="button"
-                onClick={() => setIsOrderBindModalOpen(true)}
-              >
-                <div>
-                  <strong>已关联 {selectedTask.linkedOrderIds.length} 个订单</strong>
-                  <span>
-                    {selectedTask.linkedOrderIds.length > 0
-                      ? selectedTask.linkedOrderIds.join('、')
-                      : '当前未绑定订单'}
-                  </span>
-                </div>
-                <span>点击展开订单绑定</span>
-              </button>
-            </section>
-
-            <section className="crm-customer-detail-drawer-section">
-              <div className="crm-customer-detail-section-title">
-                <span className="crm-customer-detail-section-bar" />
-              </div>
-              {selectedTaskLogs[0] ? (
-                <div className="crm-customer-detail-latest-progress">
-                  <div>
-                    <span>最新提交人</span>
-                    <strong>{selectedTaskLogs[0].submittedBy}</strong>
-                  </div>
-                  <div>
-                    <span>提交时间</span>
-                    <strong>{selectedTaskLogs[0].submittedAt}</strong>
-                  </div>
-                  <div>
-                    <span>进度</span>
-                    <strong>{selectedTaskLogs[0].progressPercent}%</strong>
-                  </div>
-                  <div>
-                    <span>任务状态</span>
-                    <strong>{selectedTaskLogs[0].status}</strong>
-                  </div>
-                  <div>
-                    <span>附件数</span>
-                    <strong>{selectedTaskLogs[0].attachments.length}</strong>
-                  </div>
-                  <div className="is-full">
-                    <span>进度说明</span>
-                    <p>{selectedTaskLogs[0].content}</p>
-                  </div>
-                  {selectedTaskLogs[0].attachments.length > 0 ? (
-                    <div className="crm-customer-detail-attachment-list crm-customer-detail-latest-progress-attachments">
-                      {selectedTaskLogs[0].attachments.map((attachment) => (
-                        <div className={`crm-customer-detail-attachment-card is-${attachment.previewMode}`} key={attachment.id}>
-                          <span>IMG</span>
-                          <strong>{attachment.name}</strong>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="crm-customer-detail-empty-card">当前任务还没有进度记录。</div>
-              )}
-            </section>
-
-            <section className="crm-customer-detail-drawer-section">
-              <div className="crm-customer-detail-section-title">
-                <span className="crm-customer-detail-section-bar" />
-                <span>进度时间线</span>
-              </div>
-              <div className="crm-customer-detail-timeline is-drawer">
-                {selectedTaskLogs.length > 0 ? (
-                  selectedTaskLogs.map((log) => (
-                    <article className="crm-customer-detail-timeline-item" key={log.id}>
-                      <div className="crm-customer-detail-timeline-dot" />
-                      <div className="crm-customer-detail-timeline-content">
-                        <div className="crm-customer-detail-timeline-head">
-                          <strong>{log.submittedBy}</strong>
-                          <span>{log.submittedAt}</span>
-                        </div>
-                        <div className="crm-customer-detail-timeline-meta">
-                          <span>{log.progressPercent}%</span>
-                          <span className={`crm-customer-detail-status-badge ${getStatusClass(log.status)}`}>
-                            {log.status}
-                          </span>
-                        </div>
-                        <p>{log.content}</p>
-                        {log.attachments.length > 0 ? (
-                          <div className="crm-customer-detail-attachment-list">
-                            {log.attachments.map((attachment) => (
-                              <div
-                                className={`crm-customer-detail-attachment-card is-${attachment.previewMode}`}
-                                key={attachment.id}
-                              >
-                                <span>IMG</span>
-                                <strong>{attachment.name}</strong>
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <div className="crm-customer-detail-empty-card">暂无进度记录。</div>
-                )}
-              </div>
-            </section>
-          </div>
-
-          <div className="crm-customer-detail-drawer-footer">
-            <button className="crm-customer-detail-primary-button" type="button" onClick={openProgressModal}>
-              提交任务进度
-            </button>
-          </div>
-        </aside>
-      ) : null}
-
-      {selectedTask && isOrderBindModalOpen ? (
+      {activeTask && isOrderBindModalOpen ? (
         <>
           <div className="crm-customer-detail-overlay-mask" onClick={closeOrderBindModal} aria-hidden="true" />
           <div className="crm-customer-detail-modal crm-customer-detail-overlay-modal" role="dialog" aria-modal="true">
@@ -4518,7 +4588,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
             <div className="crm-customer-detail-inline-form is-modal">
               <div className="crm-customer-detail-order-bind-list">
                 {customerOrders.map((order) => {
-                  const isChecked = selectedTask.linkedOrderIds.includes(order.id);
+                  const isChecked = activeTask.linkedOrderIds.includes(order.id);
                   return (
                     <button
                       className={`crm-customer-detail-order-bind-item${isChecked ? ' is-checked' : ''}`}
@@ -4543,14 +4613,14 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
         </>
       ) : null}
 
-      {selectedTask && isProgressModalOpen ? (
+      {activeTask && isProgressModalOpen ? (
         <>
           <div className="crm-customer-detail-overlay-mask" onClick={closeProgressModal} aria-hidden="true" />
           <div className="crm-customer-detail-modal crm-customer-detail-overlay-modal" role="dialog" aria-modal="true">
             <div className="crm-customer-detail-modal-header">
-              <h3>提交任务进度</h3>
+              <h3>提交任务跟进</h3>
               <button
-                aria-label="关闭提交进度弹窗"
+                aria-label="关闭提交任务跟进弹窗"
                 className="crm-customer-detail-icon-button"
                 type="button"
                 onClick={closeProgressModal}
@@ -4570,15 +4640,6 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                   />
                 </label>
                 <label>
-                  <span>进度%</span>
-                  <input
-                    value={progressForm.progressPercent}
-                    onChange={(event) =>
-                      setProgressForm((current) => ({ ...current, progressPercent: event.target.value }))
-                    }
-                  />
-                </label>
-                <label>
                   <span>任务状态</span>
                   <select
                     value={progressForm.status}
@@ -4592,13 +4653,13 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                   </select>
                 </label>
                 <label className="is-full">
-                  <span>进度说明</span>
+                  <span>跟进说明</span>
                   <textarea
                     value={progressForm.content}
                     onChange={(event) =>
                       setProgressForm((current) => ({ ...current, content: event.target.value }))
                     }
-                    placeholder="支持文字说明、节点风险和结果反馈"
+                    placeholder="支持填写本次跟进说明、风险提示和结果反馈"
                   />
                 </label>
               </div>
@@ -4622,7 +4683,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmCustomerDetail
                   取消
                 </button>
                 <button className="crm-customer-detail-primary-button" type="submit">
-                  提交进度
+                  提交跟进
                 </button>
               </div>
             </form>
