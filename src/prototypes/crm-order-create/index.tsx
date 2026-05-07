@@ -94,7 +94,82 @@ type OrderFormState = {
   orderType: string;
 };
 
+type AnnotationRecord = {
+  id: string;
+  title: string;
+  body: string;
+};
+
 const TASK_MEMORY_KEY = 'crm_order_create_task_memory_v1';
+const ANNOTATION_STORAGE_KEY = 'crm_order_create_prd_annotations_v1';
+const ANNOTATION_EXPORT_SCRIPT_ID = 'prd-annotation-export-state';
+
+const DEFAULT_ANNOTATIONS: AnnotationRecord[] = [
+  {
+    id: 'page-context',
+    title: '页面上下文',
+    body:
+      '<h3>页面上下文与导航</h3><p>该页面需要保持 CRM 后台壳层可见，让订单录入始终处于销售工作流之中。</p><ul><li>通过面包屑和激活页签清晰展示当前所在路径。</li><li>让订单创建页与客户、订单等模块保持一致的后台视觉语言。</li><li>明确当前操作是新增订单，而不是编辑既有订单。</li></ul>',
+  },
+  {
+    id: 'base-info',
+    title: '基础信息',
+    body:
+      '<h3>订单基础信息</h3><p>该区域用于在录入商品明细之前，先收集订单所需的核心商务字段。</p><ul><li>平台、单号、币种、发货、时间、优惠和备注等字段应集中在一个高密度表单区域内。</li><li>与客户联动的字段在切换客户后需要自动回填。</li><li>只读字段应明确表达它们来自客户资料，而不是手工录入。</li></ul>',
+  },
+  {
+    id: 'customer-task-link',
+    title: '客户任务联动',
+    body:
+      '<h3>客户与任务联动</h3><p>客户字段同时承担该客户未完成任务选择入口的职责。</p><ul><li>在一个控件内完成两步选择：先选客户，再选该客户的未完成任务。</li><li>同一客户上次选择过的任务需要通过本地存储记忆下来。</li><li>如果客户没有未完成任务，应展示空状态，而不是自动选中任何任务。</li></ul>',
+  },
+  {
+    id: 'order-detail',
+    title: '订单详情',
+    body:
+      '<h3>订单详情占位区</h3><p>该模块预留商品级录入和价格扩展的结构能力。</p><ul><li>订单类型选择器应保持在商品表格上方。</li><li>保留宽表头结构，便于后续继续补充商品行而无需重做布局。</li><li>即使当前没有数据，也要提供统一的“选择产品”入口。</li></ul>',
+  },
+  {
+    id: 'submit-summary',
+    title: '汇总与提交',
+    body:
+      '<h3>汇总与提交</h3><p>页面结尾需要通过轻量财务汇总和主操作按钮完成收口。</p><ul><li>在一条紧凑的信息栏中展示金额、毛利等汇总占位信息。</li><li>取消、暂存和提交动作要集中摆放，并突出主操作按钮。</li><li>提交时需要带出当前客户、任务、订单类型和平台单号等摘要信息。</li></ul>',
+  },
+];
+
+const LEGACY_ANNOTATIONS: AnnotationRecord[] = [
+  {
+    id: 'page-context',
+    title: 'Page Context',
+    body:
+      '<h3>Page context and navigation</h3><p>This page keeps the CRM back-office shell visible so order entry stays inside the same sales workflow.</p><ul><li>Show the current path through breadcrumb and active tabs.</li><li>Keep the order-create page visually consistent with the customer and order modules.</li><li>Make it clear that the operator is adding a new order rather than editing an existing one.</li></ul>',
+  },
+  {
+    id: 'base-info',
+    title: 'Base Info',
+    body:
+      '<h3>Base order information</h3><p>This block captures the required commercial fields before item details are entered.</p><ul><li>Platform, order number, currency, shipping, timing, discount, and note should stay in one dense form area.</li><li>Customer-linked fields should auto-fill when the selected customer changes.</li><li>Read-only fields should clearly communicate that they are derived from customer data.</li></ul>',
+  },
+  {
+    id: 'customer-task-link',
+    title: 'Customer Task Link',
+    body:
+      '<h3>Customer and task linkage</h3><p>The customer field is also the entry point for selecting an open task for that customer.</p><ul><li>Use a two-step cascader inside one control: choose customer first, then choose an open task.</li><li>Remember the last selected task for the same customer in local storage.</li><li>If the customer has no open tasks, show an empty state instead of auto-selecting anything.</li></ul>',
+  },
+  {
+    id: 'order-detail',
+    title: 'Order Detail',
+    body:
+      '<h3>Order detail placeholder</h3><p>This module reserves the structure for item-level entry and pricing expansion.</p><ul><li>Keep the order type selector above the item table.</li><li>Preserve the wide table header so later product rows can be added without redesigning the layout.</li><li>Provide a single add-product entry point even when there is no data yet.</li></ul>',
+  },
+  {
+    id: 'submit-summary',
+    title: 'Summary and Submission',
+    body:
+      '<h3>Summary and submission</h3><p>The page should end with a lightweight financial summary and the main actions.</p><ul><li>Show totals and margin placeholders in one compact bar.</li><li>Keep cancel, draft, and submit actions together with the primary action visually emphasized.</li><li>Submitting should emit the current customer, task, order type, and platform order number.</li></ul>',
+  },
+];
+
 
 const EVENT_LIST: EventItem[] = [
   { name: 'on_change_customer', desc: '切换客户时触发', payload: '客户编号' },
@@ -172,6 +247,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: <Package size={14} />,
     items: [
       { label: '产品列表', icon: <Package size={13} /> },
+      { label: '预售产品', icon: <ShoppingBag size={13} /> },
       { label: '产品组合', icon: <Boxes size={13} /> },
       { label: '配钻列表', icon: <FileText size={13} /> },
     ],
@@ -386,6 +462,223 @@ function writeTaskMemory(memory: Record<string, string>) {
   window.localStorage.setItem(TASK_MEMORY_KEY, JSON.stringify(memory));
 }
 
+function normalizeAnnotationState(source: unknown): AnnotationRecord[] {
+  const incoming = Array.isArray(source)
+    ? source
+        .map((item) => {
+          if (!item || typeof item !== 'object') {
+            return null;
+          }
+          const raw = item as Record<string, unknown>;
+          return {
+            id: typeof raw.id === 'string' ? raw.id : '',
+            title: typeof raw.title === 'string' ? raw.title : '',
+            body: typeof raw.body === 'string' ? raw.body : '',
+          };
+        })
+        .filter((item): item is AnnotationRecord => Boolean(item?.id && item.title))
+    : [];
+
+  const incomingMap = new Map(incoming.map((item) => [item.id, item]));
+  return DEFAULT_ANNOTATIONS.map((item) => {
+    const incomingItem = incomingMap.get(item.id);
+    const legacyItem = LEGACY_ANNOTATIONS.find((entry) => entry.id === item.id);
+    const merged = {
+      ...item,
+      ...incomingItem,
+    };
+
+    if (!legacyItem) {
+      return merged;
+    }
+
+    return {
+      ...merged,
+      title: merged.title === legacyItem.title ? item.title : merged.title,
+      body: merged.body === legacyItem.body ? item.body : merged.body,
+    };
+  });
+}
+
+function readEmbeddedAnnotationState(): AnnotationRecord[] | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const node = document.getElementById(ANNOTATION_EXPORT_SCRIPT_ID);
+  if (!node?.textContent) {
+    return null;
+  }
+  try {
+    return normalizeAnnotationState(JSON.parse(node.textContent));
+  } catch {
+    return null;
+  }
+}
+
+function readAnnotationState(): AnnotationRecord[] {
+  if (typeof window === 'undefined') {
+    return DEFAULT_ANNOTATIONS;
+  }
+
+  const embedded = readEmbeddedAnnotationState();
+  if (embedded) {
+    return embedded;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(ANNOTATION_STORAGE_KEY);
+    if (!raw) {
+      return DEFAULT_ANNOTATIONS;
+    }
+    return normalizeAnnotationState(JSON.parse(raw));
+  } catch {
+    return DEFAULT_ANNOTATIONS;
+  }
+}
+
+function syncAnnotationExportState(annotations: AnnotationRecord[]) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  let node = document.getElementById(ANNOTATION_EXPORT_SCRIPT_ID) as HTMLScriptElement | null;
+  if (!node) {
+    node = document.createElement('script');
+    node.id = ANNOTATION_EXPORT_SCRIPT_ID;
+    node.type = 'application/json';
+    document.body.appendChild(node);
+  }
+
+  node.textContent = JSON.stringify(annotations, null, 2);
+}
+
+function writeAnnotationState(annotations: AnnotationRecord[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.localStorage.setItem(ANNOTATION_STORAGE_KEY, JSON.stringify(annotations));
+  syncAnnotationExportState(annotations);
+}
+
+function downloadFile(filename: string, content: string, mimeType: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const blob = new Blob([content], { type: mimeType });
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+function htmlToMarkdown(html: string): string {
+  if (typeof document === 'undefined') {
+    return html.replace(/<[^>]+>/g, '').trim();
+  }
+
+  const container = document.createElement('div');
+  container.innerHTML = html;
+
+  const walk = (node: Node, listIndex = 0): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent || '';
+    }
+
+    if (!(node instanceof HTMLElement)) {
+      return '';
+    }
+
+    const text = Array.from(node.childNodes).map((child) => walk(child)).join('');
+    const tag = node.tagName.toLowerCase();
+
+    if (tag === 'br') {
+      return '\n';
+    }
+
+    if (tag === 'strong' || tag === 'b') {
+      return `**${text.trim()}**`;
+    }
+
+    if (tag === 'em' || tag === 'i') {
+      return `*${text.trim()}*`;
+    }
+
+    if (tag === 'li') {
+      const prefix = node.parentElement?.tagName.toLowerCase() === 'ol' ? `${listIndex + 1}. ` : '- ';
+      return `${prefix}${text.trim()}\n`;
+    }
+
+    if (tag === 'ul' || tag === 'ol') {
+      return (
+        Array.from(node.children)
+          .map((child, index) => walk(child, index))
+          .join('') + '\n'
+      );
+    }
+
+    if (tag === 'blockquote') {
+      return (
+        text
+          .trim()
+          .split('\n')
+          .map((line) => `> ${line}`)
+          .join('\n') + '\n\n'
+      );
+    }
+
+    if (/^h[1-6]$/.test(tag)) {
+      const level = Number(tag[1]);
+      return `${'#'.repeat(level)} ${text.trim()}\n\n`;
+    }
+
+    if (tag === 'p' || tag === 'div') {
+      const value = text.trim();
+      return value ? `${value}\n\n` : '';
+    }
+
+    return text;
+  };
+
+  return Array.from(container.childNodes)
+    .map((child) => walk(child))
+    .join('')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function buildAnnotationMarkdown(annotations: AnnotationRecord[]): string {
+  return annotations
+    .map(
+      (item, index) =>
+        `## 需求 [${index + 1}]：${item.title}\n\n${htmlToMarkdown(item.body) || '_暂无内容_'}\n`,
+    )
+    .join('\n');
+}
+
+function buildPublishableHtml(annotations: AnnotationRecord[]): string {
+  if (typeof document === 'undefined') {
+    return '';
+  }
+
+  const clonedDocument = document.documentElement.cloneNode(true) as HTMLElement;
+  let node = clonedDocument.querySelector(`#${ANNOTATION_EXPORT_SCRIPT_ID}`) as HTMLScriptElement | null;
+
+  if (!node) {
+    node = document.createElement('script');
+    node.id = ANNOTATION_EXPORT_SCRIPT_ID;
+    node.type = 'application/json';
+    clonedDocument.querySelector('body')?.appendChild(node);
+  }
+
+  node.textContent = JSON.stringify(annotations, null, 2);
+  return `<!DOCTYPE html>\n${clonedDocument.outerHTML}`;
+}
+
 function isOpenTask(task: TaskRecord): boolean {
   return task.status !== '已完成';
 }
@@ -396,6 +689,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
   const customers = useMemo(() => normalizeCustomers(data?.customers), [data?.customers]);
   const tasks = useMemo(() => normalizeTasks(data?.task_items), [data?.task_items]);
   const [taskMemoryMap, setTaskMemoryMap] = useState<Record<string, string>>(() => readTaskMemory());
+  const [annotations, setAnnotations] = useState<AnnotationRecord[]>(() => readAnnotationState());
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string>(DEFAULT_ANNOTATIONS[0]?.id || '');
+  const [annotationDraft, setAnnotationDraft] = useState('');
   const [isCustomerTaskPickerOpen, setIsCustomerTaskPickerOpen] = useState(false);
   const [customerTaskPickerStep, setCustomerTaskPickerStep] = useState<'customer' | 'task'>('customer');
   const [form, setForm] = useState<OrderFormState>(() => ({
@@ -403,6 +699,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
     customerId: customers[0]?.id || '',
   }));
   const customerTaskPickerRef = useRef<HTMLDivElement | null>(null);
+  const annotationEditorRef = useRef<HTMLDivElement | null>(null);
 
   const currentCustomer = useMemo(
     () => customers.find((item) => item.id === form.customerId) || null,
@@ -430,6 +727,10 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
     }
     return '请选择客户和任务';
   }, [currentCustomer, selectedTask]);
+  const activeAnnotation = useMemo(
+    () => annotations.find((item) => item.id === activeAnnotationId) || annotations[0] || null,
+    [activeAnnotationId, annotations],
+  );
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -466,9 +767,71 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
     }));
   }, [currentCustomer, form.customerId, openTasks, rememberedTask]);
 
+  useEffect(() => {
+    if (!activeAnnotation && annotations[0]) {
+      setActiveAnnotationId(annotations[0].id);
+    }
+  }, [activeAnnotation, annotations]);
+
+  useEffect(() => {
+    setAnnotationDraft(activeAnnotation?.body || '');
+  }, [activeAnnotation?.body, activeAnnotation?.id]);
+
+  useEffect(() => {
+    if (annotationEditorRef.current && annotationEditorRef.current.innerHTML !== annotationDraft) {
+      annotationEditorRef.current.innerHTML = annotationDraft;
+    }
+  }, [annotationDraft]);
+
+  useEffect(() => {
+    writeAnnotationState(annotations);
+  }, []);
+
   const emitEvent = (name: string, payload: Record<string, unknown>) => {
     onEvent?.(name, JSON.stringify(payload));
   };
+
+  const getAnnotationsWithDraft = () =>
+    annotations.map((item) => (item.id === activeAnnotation?.id ? { ...item, body: annotationDraft } : item));
+
+  const handleAnnotationSave = () => {
+    const nextAnnotations = getAnnotationsWithDraft();
+    setAnnotations(nextAnnotations);
+    writeAnnotationState(nextAnnotations);
+  };
+
+  const handleAnnotationExportMarkdown = () => {
+    const nextAnnotations = getAnnotationsWithDraft();
+    setAnnotations(nextAnnotations);
+    downloadFile('prd-page-annotation.md', buildAnnotationMarkdown(nextAnnotations), 'text/markdown;charset=utf-8');
+  };
+
+  const handleAnnotationExportHtml = () => {
+    const nextAnnotations = getAnnotationsWithDraft();
+    setAnnotations(nextAnnotations);
+    writeAnnotationState(nextAnnotations);
+    downloadFile(
+      'crm-order-create-prd-annotation.html',
+      buildPublishableHtml(nextAnnotations),
+      'text/html;charset=utf-8',
+    );
+  };
+
+  const handleAnnotationEditorInput = () => {
+    setAnnotationDraft(annotationEditorRef.current?.innerHTML || '');
+  };
+
+  const applyAnnotationFormat = (command: string, value?: string) => {
+    annotationEditorRef.current?.focus();
+    document.execCommand(command, false, value);
+    handleAnnotationEditorInput();
+  };
+
+  const getAnnotationNumber = (annotationId: string) =>
+    Math.max(
+      1,
+      annotations.findIndex((item) => item.id === annotationId) + 1,
+    );
 
   const rememberTaskForCustomer = (customerId: string, taskId: string) => {
     if (!customerId || !taskId) {
@@ -550,6 +913,21 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
     dataList: DATA_LIST,
   }));
 
+  const renderAnnotationBadge = (annotationId: string, className?: string) => (
+    <button
+      aria-label={`打开标注 ${getAnnotationNumber(annotationId)}：${
+        annotations.find((item) => item.id === annotationId)?.title || annotationId
+      }`}
+      className={`crm-order-create-annotation-badge${
+        activeAnnotation?.id === annotationId ? ' is-active' : ''
+      }${className ? ` ${className}` : ''}`}
+      type="button"
+      onClick={() => setActiveAnnotationId(annotationId)}
+    >
+      {getAnnotationNumber(annotationId)}
+    </button>
+  );
+
   return (
     <div className="crm-order-create-shell">
       <div className="crm-order-create-logo">
@@ -612,7 +990,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
       </aside>
 
       <main className="crm-order-create-main">
-        <div className="crm-order-create-tag-strip">
+        <div className="crm-order-create-annotation-target">
+          {renderAnnotationBadge('page-context')}
+          <div className="crm-order-create-tag-strip">
           {PAGE_TAGS.map((tag) => (
             <button
               className={`crm-order-create-page-tag${tag === '新建订单' ? ' is-active' : ''}`}
@@ -622,6 +1002,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
               <span>{tag}</span>
             </button>
           ))}
+          </div>
         </div>
 
         <div className="crm-order-create-card">
@@ -630,7 +1011,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
               <h1>新增订单</h1>
             </div>
 
-            <div className="crm-order-create-subsection">
+            <div className="crm-order-create-subsection crm-order-create-annotation-target">
+              {renderAnnotationBadge('base-info')}
               <div className="crm-order-create-subsection-title">
                 <span className="crm-order-create-section-bar" />
                 <span>基础信息</span>
@@ -665,6 +1047,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
                 </label>
 
                 <label className="crm-order-create-field crm-order-create-field customer-task-field">
+                  {renderAnnotationBadge('customer-task-link', 'is-inline')}
                   <span>* 客户</span>
                   <div className="crm-order-create-cascader" ref={customerTaskPickerRef}>
                     <button
@@ -837,7 +1220,8 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
               </div>
             </div>
 
-            <div className="crm-order-create-subsection order-detail-section">
+            <div className="crm-order-create-subsection order-detail-section crm-order-create-annotation-target">
+              {renderAnnotationBadge('order-detail')}
               <div className="crm-order-create-subsection-title">
                 <span className="crm-order-create-section-bar" />
                 <span>订单详情</span>
@@ -878,7 +1262,9 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
               </div>
             </div>
 
-            <div className="crm-order-create-footer-bar">
+            <div className="crm-order-create-annotation-target">
+              {renderAnnotationBadge('submit-summary')}
+              <div className="crm-order-create-footer-bar">
               <span>产品共计：0件</span>
               <span>预计成本：¥0.00</span>
               <span>预计毛利(按汇率换算)：¥0.00</span>
@@ -886,7 +1272,7 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
               <span>总金额(含客户运费)：¥0.00</span>
             </div>
 
-            <div className="crm-order-create-actions">
+              <div className="crm-order-create-actions">
               <button className="crm-order-create-secondary-button" type="button" onClick={resetForm}>
                 取消
               </button>
@@ -896,10 +1282,75 @@ const Component = forwardRef<AxureHandle, AxureProps>(function CrmOrderCreate(pr
               <button className="crm-order-create-primary-button" type="button" onClick={handleSubmit}>
                 添加订单
               </button>
+              </div>
             </div>
           </section>
         </div>
       </main>
+
+      <aside className="crm-order-create-annotation-panel">
+        <div className="crm-order-create-annotation-panel-header">
+          <span className="crm-order-create-annotation-panel-eyebrow">PRD 标注编辑器</span>
+          <h2>{activeAnnotation?.title || '标注说明'}</h2>
+          <p>你可以直接编辑当前模块需求文案，并将结果保存到本地，或导出整套标注内容。</p>
+        </div>
+
+        <div className="crm-order-create-annotation-chip-list">
+          {annotations.map((item, index) => (
+            <button
+              key={item.id}
+              className={`crm-order-create-annotation-chip${activeAnnotation?.id === item.id ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => setActiveAnnotationId(item.id)}
+            >
+              <span>{index + 1}</span>
+              <strong>{item.title}</strong>
+            </button>
+          ))}
+        </div>
+
+        <div className="crm-order-create-annotation-toolbar">
+          <button type="button" onClick={() => applyAnnotationFormat('bold')}>
+            加粗
+          </button>
+          <button type="button" onClick={() => applyAnnotationFormat('insertUnorderedList')}>
+            列表
+          </button>
+          <button type="button" onClick={() => applyAnnotationFormat('formatBlock', 'blockquote')}>
+            引用
+          </button>
+        </div>
+
+        <div className="crm-order-create-annotation-editor-shell">
+          <div className="crm-order-create-annotation-meta">
+            <span className="crm-order-create-annotation-order">
+              需求 {getAnnotationNumber(activeAnnotation?.id || DEFAULT_ANNOTATIONS[0]?.id || 'page-context')}
+            </span>
+            <span className="crm-order-create-annotation-hint">
+              当前编辑中的最新内容会一并进入 Markdown 和可发布 HTML 导出结果。
+            </span>
+          </div>
+          <div
+            ref={annotationEditorRef}
+            className="crm-order-create-annotation-editor"
+            contentEditable
+            suppressContentEditableWarning
+            onInput={handleAnnotationEditorInput}
+          />
+        </div>
+
+        <div className="crm-order-create-annotation-actions">
+          <button type="button" onClick={handleAnnotationSave}>
+            保存
+          </button>
+          <button type="button" onClick={handleAnnotationExportMarkdown}>
+            导出 Markdown
+          </button>
+          <button type="button" onClick={handleAnnotationExportHtml}>
+            导出发布版 HTML
+          </button>
+        </div>
+      </aside>
 
       <button className="crm-order-create-float-back" type="button" aria-label="返回">
         <Search size={16} />

@@ -334,6 +334,7 @@ const NAV_GROUPS: NavGroup[] = [
     icon: <Package size={14} />,
     items: [
       { label: '产品列表', icon: <Package size={13} /> },
+      { label: '预售产品', icon: <ShoppingBag size={13} /> },
       { label: '产品组合', icon: <Boxes size={13} /> },
       { label: '团购列表', icon: <FileText size={13} /> },
     ],

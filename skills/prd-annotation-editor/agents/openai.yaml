@@ -1,0 +1,4 @@
+interface:
+  display_name: "PRD Annotation Editor"
+  short_description: "Editable PRD annotations with publishing export"
+  default_prompt: "Use this skill to initialize or update PRD-linked page annotations with a right-side editable requirements panel, Markdown export, and publishable persistence for GitHub Pages or static HTML."

@@ -61,3 +61,8 @@
 - 文件名：英文（如 `users.json`、`order-items.json`）
 - `records`：数组；每条记录必须有唯一 `id`（允许 number 或 string，同表保持类型一致）
 - 字段：优先中文并与页面一致；同字段同类型；图片字段用相对路径（如 `images/xxx.png`）
+
+## 当前业务表补充
+
+- `proofing_products.json`：打板产品任务表，供 `crm-presale-product` 原型使用
+- 若页面需要兼容旧数据结构，可在页面层做转换，但数据库样例应优先维护最新结构

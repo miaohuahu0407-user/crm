@@ -1,0 +1,2711 @@
+@import "tailwindcss";
+
+/* ========== CSS 变量（与客户详情页4完全一致） ========== */
+.crm-presale-product-shell {
+    --sidebar-width: 200px;
+    --brand-blue: #2563eb;
+    --brand-blue-light: #3b82f6;
+    --brand-blue-lighter: #eff6ff;
+    --line-color: #e5e7eb;
+    --muted-text: #9ca3af;
+    --body-bg: #f3f4f6;
+    --panel-bg: #ffffff;
+    --link-blue: #2563eb;
+    --link-blue-weak: #eff6ff;
+    --risk-bg: #fef2f2;
+    --risk-text: #dc2626;
+    --done-bg: #ecfdf5;
+    --done-text: #059669;
+    --warn-bg: #fffbeb;
+    --warn-text: #d97706;
+    --discard-bg: #f3f4f6;
+    --discard-text: #9ca3af;
+    --pending-bg: #f3f4f6;
+    --pending-text: #6b7280;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    --shadow-soft: 0 12px 32px rgba(24, 45, 84, 0.08);
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    grid-template-rows: 48px minmax(0, 1fr);
+    grid-template-areas:
+        "logo topbar"
+        "sidebar main";
+    background: var(--body-bg);
+    color: #111827;
+    font-family: 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    position: relative;
+}
+
+/* ========== Logo ========== */
+.crm-presale-product-logo {
+    grid-area: logo;
+    background: var(--brand-blue);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    box-sizing: border-box;
+}
+.crm-presale-product-logo-mark {
+    width: 18px;
+    height: 18px;
+    border: 3px solid #ff8a1e;
+    border-radius: 50%;
+    position: relative;
+    box-sizing: border-box;
+}
+.crm-presale-product-logo-mark span {
+    position: absolute;
+    inset: 3px;
+    border-left: 3px solid #ff8a1e;
+    border-bottom: 3px solid transparent;
+    border-top: 3px solid transparent;
+    border-radius: 50%;
+}
+.crm-presale-product-logo-text {
+    font-size: 13px;
+    letter-spacing: 1px;
+    font-weight: 700;
+}
+
+/* ========== Topbar ========== */
+.crm-presale-product-topbar {
+    grid-area: topbar;
+    background: #ffffff;
+    border-bottom: 1px solid var(--line-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px 0 8px;
+    box-sizing: border-box;
+}
+.crm-presale-product-topbar-left,
+.crm-presale-product-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.crm-presale-product-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #9aa4b6;
+    font-size: 12px;
+}
+.crm-presale-product-operator {
+    font-size: 12px;
+    color: #596983;
+}
+.crm-presale-product-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    background: linear-gradient(180deg, #ffe6ea 0%, #ffd1dc 100%);
+    border: 1px solid #f1c4ce;
+    color: #c86a86;
+    font-size: 13px;
+}
+
+/* ========== Buttons ========== */
+.crm-presale-product-icon-button {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line-color);
+    background: #ffffff;
+    color: #66758f;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.crm-presale-product-icon-button:hover {
+    background: #f0f4fa;
+    border-color: #bfd4ff;
+    color: var(--link-blue);
+}
+.crm-presale-product-primary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--link-blue);
+    background: var(--link-blue);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.crm-presale-product-primary-button:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    filter: brightness(1.05);
+}
+.crm-presale-product-primary-button:active {
+    transform: translateY(1px);
+}
+.crm-presale-product-primary-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.crm-presale-product-secondary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line-color);
+    background: #ffffff;
+    color: #66758f;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.crm-presale-product-secondary-button:hover {
+    background: #f0f4fa;
+    border-color: #bfd4ff;
+}
+.crm-presale-product-ghost-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--link-blue);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.crm-presale-product-ghost-button:hover {
+    background: var(--brand-blue-lighter);
+}
+
+/* Danger button (for discard/delete) */
+.crm-presale-product-danger-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid #fecaca;
+    background: #ffffff;
+    color: var(--risk-text);
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.crm-presale-product-danger-button:hover {
+    background: var(--risk-bg);
+    border-color: #fca5a5;
+}
+
+/* Warning button (for convert to regular) */
+.crm-presale-product-warn-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    border: 1px solid #fcd34d;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.crm-presale-product-warn-button:hover {
+    background: #fef3c7;
+    border-color: #fbbf24;
+}
+.crm-presale-product-warn-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ========== Sidebar ========== */
+.crm-presale-product-sidebar {
+    grid-area: sidebar;
+    background: #ffffff;
+    border-right: 1px solid var(--line-color);
+    overflow-y: auto;
+}
+.crm-presale-product-nav {
+    padding: 12px 0 20px;
+}
+.crm-presale-product-nav-group {
+    padding: 0 10px;
+}
+.crm-presale-product-nav-parent,
+.crm-presale-product-nav-child {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: #374151;
+    text-align: left;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+}
+.crm-presale-product-nav-parent {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    margin-bottom: 2px;
+}
+.crm-presale-product-nav-parent:hover {
+    background: #f9fafb;
+    color: #111827;
+}
+.crm-presale-product-nav-parent-label,
+.crm-presale-product-nav-child {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.crm-presale-product-nav-children {
+    display: grid;
+    gap: 2px;
+    padding-bottom: 4px;
+}
+.crm-presale-product-nav-child {
+    padding: 8px 12px 8px 40px;
+    font-size: 12px;
+    color: #6b7280;
+    border-radius: var(--radius-md);
+}
+.crm-presale-product-nav-child:hover {
+    background: #f9fafb;
+    color: #374151;
+}
+.crm-presale-product-nav-child.is-active {
+    color: var(--link-blue);
+    font-weight: 600;
+    background: var(--brand-blue-lighter);
+    border-radius: var(--radius-md);
+    position: relative;
+}
+.crm-presale-product-nav-child.is-active::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 14px;
+    border-radius: 999px;
+    background: var(--link-blue);
+}
+
+/* ========== Main ========== */
+.crm-presale-product-main {
+    grid-area: main;
+    min-width: 0;
+    padding: 8px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.crm-presale-product-tag-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    background: var(--panel-bg);
+    border: 1px solid var(--line-color);
+    border-radius: 14px;
+}
+.crm-presale-product-page-tag {
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid var(--line-color);
+    background: #ffffff;
+    color: #66758f;
+}
+.crm-presale-product-page-tag:hover {
+    background: #f0f4fa;
+    border-color: #bfd4ff;
+}
+.crm-presale-product-page-tag.is-active {
+    background: var(--link-blue);
+    border-color: var(--link-blue);
+    color: #ffffff;
+}
+
+/* ========== Card (now with inner sidebar) ========== */
+.crm-presale-product-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--line-color);
+    border-radius: 14px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    min-height: 0;
+}
+
+/* ========== Category Sidebar (inside card) ========== */
+.crm-presale-product-cat-sidebar {
+    width: 180px;
+    min-width: 180px;
+    border-right: 1px solid var(--line-color);
+    background: #fafbfc;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 8px;
+    gap: 2px;
+    overflow-y: auto;
+}
+.crm-presale-product-cat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    color: #374151;
+    transition: all 0.15s ease;
+    gap: 6px;
+}
+.crm-presale-product-cat-item:hover {
+    background: #ffffff;
+    border-color: #e5e7eb;
+}
+.crm-presale-product-cat-item.is-active {
+    background: var(--brand-blue-lighter);
+    border-color: #bfd4ff;
+    color: var(--link-blue);
+    font-weight: 600;
+    position: relative;
+}
+.crm-presale-product-cat-item.is-active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--link-blue);
+}
+.crm-presale-product-cat-item .cat-label {
+    flex: 1;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.crm-presale-product-cat-item .cat-count {
+    font-size: 11px;
+    color: var(--muted-text);
+    font-weight: 400;
+    background: #e5e7eb;
+    border-radius: 10px;
+    padding: 1px 7px;
+    min-width: 18px;
+    text-align: center;
+}
+.crm-presale-product-cat-item.is-active .cat-count {
+    background: #bfd4ff;
+    color: var(--link-blue);
+}
+.crm-presale-product-cat-arrows {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.crm-presale-product-cat-item:hover .crm-presale-product-cat-arrows {
+    opacity: 1;
+}
+.crm-presale-product-cat-arrow {
+    width: 16px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: var(--muted-text);
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 0;
+    transition: all 0.15s ease;
+}
+.crm-presale-product-cat-arrow:hover {
+    color: var(--link-blue);
+    background: #eff6ff;
+}
+.crm-presale-product-cat-arrow:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+.crm-presale-product-cat-manage {
+    margin-top: auto;
+    padding: 6px 12px;
+    border: 1px dashed #d1d5db;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--muted-text);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+.crm-presale-product-cat-manage:hover {
+    border-color: var(--link-blue);
+    color: var(--link-blue);
+    background: #f9fafb;
+}
+
+/* ========== Card content (right of category sidebar) ========== */
+.crm-presale-product-card-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ========== Page Header ========== */
+.crm-presale-product-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line-color);
+}
+.crm-presale-product-page-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #111827;
+}
+
+/* ========== Filter Bar ========== */
+.crm-presale-product-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--line-color);
+    flex-wrap: wrap;
+}
+.crm-presale-product-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.crm-presale-product-filter-pill {
+    border: 1px solid var(--line-color);
+    background: #ffffff;
+    color: #66758f;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.crm-presale-product-filter-pill:hover {
+    background: #f0f4fa;
+    border-color: #bfd4ff;
+}
+.crm-presale-product-filter-pill.is-active {
+    background: var(--link-blue);
+    border-color: var(--link-blue);
+    color: #ffffff;
+}
+.crm-presale-product-filter-spacer {
+    flex: 1;
+}
+.crm-presale-product-filter-selects {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.crm-presale-product-search-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line-color);
+    background: #ffffff;
+    font-size: 12px;
+    color: #66758f;
+    min-width: 180px;
+}
+.crm-presale-product-search-field input {
+    border: 0;
+    outline: none;
+    font-size: 12px;
+    color: #374151;
+    background: transparent;
+    flex: 1;
+    min-width: 0;
+}
+.crm-presale-product-search-field input::placeholder {
+    color: var(--muted-text);
+}
+.crm-presale-product-select {
+    border: 1px solid var(--line-color);
+    border-radius: var(--radius-md);
+    padding: 5px 10px;
+    font-size: 12px;
+    color: #374151;
+    background: #ffffff;
+    cursor: pointer;
+    outline: none;
+    min-width: 120px;
+}
+
+/* ========== Data Table (simpler, no expand) ========== */
+.crm-presale-product-table-wrap {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+}
+.crm-presale-product-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+.crm-presale-product-table th {
+    text-align: left;
+    padding: 10px 16px;
+    color: #6b7280;
+    font-weight: 500;
+    background: #f9fafb;
+    border-bottom: 1px solid var(--line-color);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.crm-presale-product-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f3f4f6;
+    color: #374151;
+    white-space: nowrap;
+}
+.crm-presale-product-table tbody tr {
+    transition: background 0.15s ease;
+}
+.crm-presale-product-table tbody tr:hover {
+    background: #f9fafb;
+}
+.crm-presale-product-table tbody tr.is-selected {
+    background: var(--brand-blue-lighter);
+    box-shadow: inset 3px 0 0 var(--link-blue);
+}
+.crm-presale-product-table .col-id {
+    color: var(--muted-text);
+    font-family: monospace;
+    font-size: 11px;
+}
+.crm-presale-product-table-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    object-fit: cover;
+    display: block;
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+}
+.crm-presale-product-table-thumb.is-clickable {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.crm-presale-product-table-thumb.is-clickable:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(37, 99, 235, 0.14);
+}
+.crm-presale-product-table .col-link {
+    color: var(--link-blue);
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+.crm-presale-product-table .col-link:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+.crm-presale-product-table .col-spec-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+}
+.crm-presale-product-table .col-spec-count.is-active {
+    color: var(--link-blue);
+}
+.crm-presale-product-table .col-spec-count.is-converted {
+    color: #059669;
+}
+.crm-presale-product-table .col-spec-count.is-discarded {
+    color: #9ca3af;
+}
+
+/* ========== Status Badges ========== */
+.crm-presale-product-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.crm-presale-product-status-badge.is-pending-proof {
+    background: var(--pending-bg);
+    color: var(--pending-text);
+}
+.crm-presale-product-status-badge.is-proofing {
+    background: var(--brand-blue-lighter);
+    color: var(--link-blue);
+}
+.crm-presale-product-status-badge.is-proofed {
+    background: var(--warn-bg);
+    color: var(--warn-text);
+}
+.crm-presale-product-status-badge.is-confirmed {
+    background: var(--done-bg);
+    color: var(--done-text);
+}
+.crm-presale-product-status-badge.is-converted {
+    background: #ecfdf5;
+    color: #047857;
+}
+.crm-presale-product-status-badge.is-not-converted {
+    background: #eef2ff;
+    color: #4338ca;
+}
+.crm-presale-product-status-badge.is-discarded {
+    background: var(--discard-bg);
+    color: var(--discard-text);
+}
+.crm-presale-product-status-badge.is-shipped {
+    background: #ecfeff;
+    color: #0f766e;
+}
+
+.crm-presale-product-status-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 148px;
+}
+
+.crm-presale-product-status-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.crm-presale-product-status-line .status-label {
+    font-size: 11px;
+    color: #6b7280;
+    white-space: nowrap;
+}
+
+/* ========== Progress Bar ========== */
+.crm-presale-product-progress-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 100px;
+}
+.crm-presale-product-progress-track {
+    flex: 1;
+    height: 5px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    overflow: hidden;
+    max-width: 60px;
+}
+.crm-presale-product-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    transition: width 0.3s ease;
+}
+.crm-presale-product-progress-fill.is-converted {
+    background: linear-gradient(90deg, #10b981, #059669);
+}
+.crm-presale-product-progress-fill.is-discarded {
+    background: #d1d5db;
+}
+.crm-presale-product-progress-text {
+    font-size: 10px;
+    color: #6b7280;
+    min-width: 24px;
+}
+
+/* ========== Table Actions ========== */
+.crm-presale-product-table-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+.crm-presale-product-table-actions > button {
+    flex-shrink: 0;
+}
+.crm-presale-product-action-btn {
+    border: 1px solid var(--line-color);
+    background: #ffffff;
+    color: #66758f;
+    cursor: pointer;
+    padding: 3px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    transition: all 0.2s ease;
+}
+.crm-presale-product-action-btn:hover {
+    background: #f0f4fa;
+    border-color: #bfd4ff;
+    color: var(--link-blue);
+}
+.crm-presale-product-action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ========== Empty State ========== */
+.crm-presale-product-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    color: var(--muted-text);
+    gap: 12px;
+}
+.crm-presale-product-empty-state strong {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 500;
+}
+.crm-presale-product-empty-state p {
+    font-size: 12px;
+}
+
+/* ========== Drawer ========== */
+.crm-presale-product-drawer-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 50;
+    animation: presale-mask-enter 0.2s ease;
+}
+@keyframes presale-mask-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.crm-presale-product-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(1120px, calc(100vw - 48px));
+    max-width: calc(100vw - 20px);
+    background: #ffffff;
+    z-index: 51;
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    flex-direction: column;
+    animation: presale-drawer-enter 0.25s ease;
+}
+@keyframes presale-drawer-enter {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+.crm-presale-product-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line-color);
+}
+.crm-presale-product-drawer-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+}
+.crm-presale-product-drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.crm-presale-product-drawer-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.crm-presale-product-drawer-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted-text);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.crm-presale-product-drawer-info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px 16px;
+}
+.crm-presale-product-drawer-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    overflow: hidden;
+}
+.crm-presale-product-drawer-info-item .label {
+    font-size: 11px;
+    color: var(--muted-text);
+    white-space: nowrap;
+}
+.crm-presale-product-drawer-info-item .value {
+    font-size: 12px;
+    color: #374151;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.crm-presale-product-drawer-info-item .value.is-link {
+    color: var(--link-blue);
+    cursor: pointer;
+}
+.crm-presale-product-drawer-info-item .value.is-link:hover {
+    text-decoration: underline;
+}
+.crm-presale-product-drawer-info-item.is-full {
+    grid-column: 1 / -1;
+}
+
+/* Drawer: product thumbnail */
+.crm-presale-product-drawer-thumb {
+    width: 100%;
+    max-height: 120px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line-color);
+    background: #f9fafb;
+}
+
+/* Drawer: source type tag */
+.crm-presale-product-source-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+.crm-presale-product-source-tag.is-new {
+    background: var(--brand-blue-lighter);
+    color: var(--link-blue);
+}
+.crm-presale-product-source-tag.is-existing {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* ========== Supplier card (in drawer) ========== */
+.crm-presale-product-supplier-card {
+    padding: 14px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, #f7faff 0%, #eef4ff 100%);
+    border: 1px solid #e1eaf8;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.crm-presale-product-supplier-card .supplier-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+}
+.crm-presale-product-supplier-card .supplier-contact {
+    font-size: 12px;
+    color: #6b7280;
+    display: flex;
+    gap: 12px;
+}
+
+/* ========== Drawer Footer ========== */
+.crm-presale-product-drawer-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--line-color);
+    background: #f9fafb;
+}
+
+/* ========== Spec Groups (in drawer) ========== */
+.crm-presale-product-spec-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.crm-presale-product-spec-tabs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.crm-presale-product-spec-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--line-color);
+    background: #ffffff;
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.crm-presale-product-spec-tab:hover {
+    border-color: #bfd4ff;
+    background: #f8fbff;
+    color: var(--link-blue);
+}
+.crm-presale-product-spec-tab.is-active {
+    border-color: #bfd4ff;
+    background: var(--brand-blue-lighter);
+    color: var(--link-blue);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.08);
+}
+.crm-presale-product-spec-tab .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.crm-presale-product-spec-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    padding-bottom: 2px;
+}
+.crm-presale-product-spec-group-header .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.crm-presale-product-spec-group-header .dot.is-active {
+    background: var(--link-blue);
+}
+.crm-presale-product-spec-group-header .dot.is-converted {
+    background: var(--done-text);
+}
+.crm-presale-product-spec-group-header .dot.is-discarded {
+    background: var(--discard-text);
+}
+.crm-presale-product-spec-group-empty {
+    font-size: 12px;
+    color: var(--muted-text);
+    padding: 10px 0;
+}
+
+/* Spec table */
+.crm-presale-product-spec-table {
+    --spec-table-columns: 120px 80px 120px 1fr 140px 120px 72px 90px;
+    border: 1px solid var(--line-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: #ffffff;
+}
+.crm-presale-product-spec-table-header {
+    display: grid;
+    grid-template-columns: var(--spec-table-columns);
+    gap: 0;
+    padding: 0 12px;
+    min-height: 32px;
+    align-items: center;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--line-color);
+}
+.crm-presale-product-spec-table-header .spec-header-cell {
+    font-size: 11px;
+    color: var(--muted-text);
+    font-weight: 600;
+    padding: 0 8px;
+    white-space: nowrap;
+}
+.crm-presale-product-spec-list {
+    background: #ffffff;
+}
+.crm-presale-product-spec-list-item {
+    display: grid;
+    grid-template-columns: var(--spec-table-columns);
+    gap: 0;
+    padding: 0 12px;
+    min-height: 52px;
+    align-items: center;
+    background: #f9faff;
+}
+.crm-presale-product-spec-list-item + .crm-presale-product-spec-list-item {
+    border-top: 1px solid var(--line-color);
+}
+.crm-presale-product-spec-list-item.is-converted {
+    background: #f6fef9;
+}
+.crm-presale-product-spec-list-item.is-discarded {
+    background: #f3f4f6;
+}
+.crm-presale-product-spec-list-item .spec-list-cell {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px;
+    overflow: hidden;
+}
+.crm-presale-product-spec-list-item .spec-list-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.crm-presale-product-spec-list-item .spec-list-id {
+    font-size: 10px;
+    color: var(--muted-text);
+    font-family: monospace;
+}
+.crm-presale-product-spec-list-item .spec-list-badge {
+    flex-shrink: 0;
+    width: fit-content;
+}
+.crm-presale-product-spec-list-item .spec-list-image {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid var(--line-color);
+    background: #f9fafb;
+}
+.crm-presale-product-spec-list-item .spec-list-desc {
+    font-size: 12px;
+    color: #6b7280;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.crm-presale-product-spec-list-item .spec-list-customers {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.crm-presale-product-spec-list-item .spec-list-customer-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1px solid var(--line-color);
+    color: #6b7280;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.crm-presale-product-spec-list-item .spec-list-customer-tag:hover {
+    border-color: var(--link-blue);
+    color: var(--link-blue);
+}
+.crm-presale-product-spec-list-item .spec-list-supplier {
+    font-size: 12px;
+    color: #374151;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.crm-presale-product-spec-list-item .spec-list-empty-text,
+.crm-presale-product-spec-list-item .spec-list-date {
+    font-size: 11px;
+    color: var(--muted-text);
+    white-space: nowrap;
+}
+.crm-presale-product-spec-list-item .spec-list-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.crm-presale-product-spec-list-item .spec-list-progress {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.crm-presale-product-spec-list-item .spec-list-cell.is-status {
+    align-items: flex-start;
+}
+.crm-presale-product-spec-list-item .spec-list-cell.is-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.crm-presale-product-spec-list-item .spec-list-cell.is-actions.is-readonly {
+    justify-content: center;
+}
+.crm-presale-product-spec-list-item .spec-list-readonly-text {
+    font-size: 11px;
+    color: var(--muted-text);
+    text-align: left;
+    line-height: 1.5;
+}
+.crm-presale-product-spec-list-item .spec-list-supplier-button {
+    font-size: 12px;
+    font-weight: 500;
+    color: #111827;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.crm-presale-product-spec-list-item .spec-list-supplier-button:hover {
+    color: var(--link-blue);
+}
+.crm-presale-product-spec-list-item .spec-list-subtext {
+    font-size: 10px;
+    color: var(--muted-text);
+    display: flex;
+    gap: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+@media (max-width: 960px) {
+    .crm-presale-product-drawer {
+        width: calc(100vw - 24px);
+        max-width: calc(100vw - 12px);
+    }
+
+    .crm-presale-product-drawer-info-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .crm-presale-product-spec-table {
+        --spec-table-columns: 100px 64px 100px 1fr 100px 100px 64px 80px;
+    }
+}
+
+@media (max-width: 760px) {
+    .crm-presale-product-drawer-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .crm-presale-product-spec-tabs {
+        gap: 6px;
+    }
+
+    .crm-presale-product-spec-tab {
+        padding: 5px 8px;
+        font-size: 11px;
+    }
+
+    .crm-presale-product-spec-table-header {
+        display: none;
+    }
+
+    .crm-presale-product-spec-list-item {
+        grid-template-columns: 1fr;
+        padding: 10px 12px;
+        gap: 6px;
+        min-height: 0;
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell {
+        padding: 0;
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell::before {
+        font-size: 10px;
+        color: var(--muted-text);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell.is-spec::before {
+        content: '规格名称';
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell.is-image::before {
+        content: '图片';
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell.is-date::before {
+        content: '预计完成日期';
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell.is-description::before {
+        content: '规格描述';
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell.is-customers::before {
+        content: '关联客户';
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell.is-supplier::before {
+        content: '供应商';
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell.is-status::before {
+        content: '状态';
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell.is-actions::before {
+        content: '操作';
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-cell.is-actions {
+        align-items: flex-start;
+    }
+
+    .crm-presale-product-spec-list-item .spec-list-readonly-text {
+        text-align: left;
+    }
+}
+
+/* ========== Modal ========== */
+.crm-presale-product-modal-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 60;
+    animation: presale-mask-enter 0.2s ease;
+}
+.crm-presale-product-modal-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 61;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    pointer-events: none;
+}
+.crm-presale-product-modal {
+    background: #ffffff;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-soft);
+    width: 780px;
+    max-width: 92vw;
+    max-height: 88vh;
+    overflow-y: auto;
+    pointer-events: auto;
+    animation: presale-modal-enter 0.25s ease;
+}
+@keyframes presale-modal-enter {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+.crm-presale-product-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line-color);
+}
+.crm-presale-product-modal-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+}
+.crm-presale-product-modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.crm-presale-product-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--line-color);
+    background: #f9fafb;
+}
+
+/* ========== Form ========== */
+.crm-presale-product-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 20px;
+}
+.crm-presale-product-form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #6b7280;
+}
+.crm-presale-product-form-grid label.is-full {
+    grid-column: 1 / -1;
+}
+.crm-presale-product-form-grid label .char-hint {
+    font-weight: 400;
+    color: var(--muted-text);
+    float: right;
+}
+.crm-presale-product-form-grid input,
+.crm-presale-product-form-grid select,
+.crm-presale-product-form-grid textarea {
+    border: 1px solid var(--line-color);
+    border-radius: var(--radius-md);
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #374151;
+    background: #ffffff;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.15s ease;
+}
+.crm-presale-product-form-grid input:focus,
+.crm-presale-product-form-grid select:focus,
+.crm-presale-product-form-grid textarea:focus {
+    border-color: var(--link-blue);
+    box-shadow: 0 0 0 2px var(--brand-blue-lighter);
+}
+.crm-presale-product-form-grid textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+.crm-presale-product-form-grid input::placeholder,
+.crm-presale-product-form-grid textarea::placeholder {
+    color: var(--muted-text);
+}
+
+/* ========== Searchable Select ========== */
+.crm-presale-product-searchable-select {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #6b7280;
+}
+.crm-presale-product-searchable-label {
+    font-size: 12px;
+    color: #6b7280;
+}
+.crm-presale-product-searchable-wrapper {
+    position: relative;
+}
+.crm-presale-product-searchable-input {
+    width: 100%;
+    border: 1px solid var(--line-color);
+    border-radius: var(--radius-md);
+    padding: 6px 10px;
+    font-size: 13px;
+    color: #374151;
+    background: #ffffff;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.15s ease;
+    box-sizing: border-box;
+}
+.crm-presale-product-searchable-input:focus {
+    border-color: var(--link-blue);
+    box-shadow: 0 0 0 2px var(--brand-blue-lighter);
+}
+.crm-presale-product-searchable-input::placeholder {
+    color: var(--muted-text);
+}
+.crm-presale-product-searchable-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    margin-top: 4px;
+    background: #ffffff;
+    border: 1px solid var(--line-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    max-height: 200px;
+    overflow-y: auto;
+}
+.crm-presale-product-searchable-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    font-size: 12px;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    width: 100%;
+}
+.crm-presale-product-searchable-option:hover {
+    background: #f0f4fa;
+}
+.crm-presale-product-searchable-option.is-selected {
+    background: var(--brand-blue-lighter);
+    color: var(--link-blue);
+}
+.crm-presale-product-searchable-empty {
+    padding: 12px;
+    font-size: 12px;
+    color: var(--muted-text);
+    text-align: center;
+}
+
+/* ========== Radio Group ========== */
+.crm-presale-product-radio-group {
+    display: flex;
+    gap: 12px;
+}
+.crm-presale-product-radio-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #374151;
+    cursor: pointer;
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line-color);
+    background: #ffffff;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+.crm-presale-product-radio-item:hover {
+    border-color: #bfd4ff;
+    background: #f9fafb;
+}
+.crm-presale-product-radio-item.is-selected {
+    border-color: var(--link-blue);
+    background: var(--brand-blue-lighter);
+    color: var(--link-blue);
+    font-weight: 500;
+}
+.crm-presale-product-radio-item input[type="radio"] {
+    accent-color: var(--link-blue);
+}
+
+/* ========== Spec Entry Table (in create modal) ========== */
+.crm-presale-product-spec-entry-table {
+    border: 1px solid var(--line-color);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+.crm-presale-product-spec-entry-table-header {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    min-height: 34px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--line-color);
+}
+.crm-presale-product-spec-entry-table-header .spec-entry-col {
+    font-size: 11px;
+    color: var(--muted-text);
+    font-weight: 600;
+    padding: 0 6px;
+}
+.crm-presale-product-spec-entry-row {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    min-height: 44px;
+    border-bottom: 1px solid #f3f4f6;
+}
+.crm-presale-product-spec-entry-row:last-child {
+    border-bottom: 0;
+}
+.spec-entry-col {
+    padding: 6px 6px;
+    box-sizing: border-box;
+}
+.spec-entry-col.is-plating {
+    width: 100px;
+    flex-shrink: 0;
+}
+.spec-entry-col.is-color {
+    width: 100px;
+    flex-shrink: 0;
+}
+.spec-entry-col.is-image {
+    width: 64px;
+    flex-shrink: 0;
+}
+.spec-entry-col.is-date {
+    width: 110px;
+    flex-shrink: 0;
+}
+.spec-entry-col.is-desc {
+    flex: 1;
+    min-width: 0;
+}
+.spec-entry-col.is-customers {
+    width: 160px;
+    flex-shrink: 0;
+}
+.spec-entry-col.is-action {
+    width: 80px;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+}
+.crm-presale-product-spec-entry-row select,
+.crm-presale-product-spec-entry-row input {
+    width: 100%;
+    border: 1px solid var(--line-color);
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+    font-size: 12px;
+    color: #374151;
+    outline: none;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+.crm-presale-product-spec-entry-row select:focus,
+.crm-presale-product-spec-entry-row input:focus {
+    border-color: var(--link-blue);
+    box-shadow: 0 0 0 2px var(--brand-blue-lighter);
+}
+
+/* Spec entry image upload */
+.spec-entry-upload {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px dashed var(--line-color);
+    border-radius: var(--radius-sm);
+    background: #ffffff;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.15s ease;
+}
+.spec-entry-upload:hover {
+    border-color: var(--link-blue);
+}
+.spec-entry-upload-input {
+    display: none;
+}
+.spec-entry-upload-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.spec-entry-upload-placeholder {
+    color: var(--muted-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ========== Customer Multi-Select ========== */
+.crm-presale-product-customer-multi {
+    position: relative;
+}
+.crm-presale-product-customer-multi-trigger {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 8px;
+    border: 1px solid var(--line-color);
+    border-radius: var(--radius-sm);
+    background: #ffffff;
+    cursor: pointer;
+    font-size: 12px;
+    color: #6b7280;
+    min-width: 160px;
+    flex-wrap: wrap;
+    min-height: 30px;
+    transition: border-color 0.15s ease;
+}
+.crm-presale-product-customer-multi-trigger:hover {
+    border-color: #bfd4ff;
+}
+.crm-presale-product-customer-multi-trigger.is-open {
+    border-color: var(--link-blue);
+    box-shadow: 0 0 0 2px var(--brand-blue-lighter);
+}
+.crm-presale-product-customer-multi-trigger .placeholder {
+    color: var(--muted-text);
+}
+.crm-presale-product-customer-multi-trigger .tag-list {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+.crm-presale-product-customer-multi-trigger .tag-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 8px;
+    background: var(--brand-blue-lighter);
+    color: var(--link-blue);
+    font-size: 11px;
+    font-weight: 500;
+}
+.crm-presale-product-customer-multi-trigger .tag-item button {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 0;
+    background: transparent;
+    color: var(--link-blue);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    font-size: 10px;
+}
+.crm-presale-product-customer-multi-trigger .tag-item button:hover {
+    background: #bfd4ff;
+}
+.crm-presale-product-customer-multi-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    margin-top: 4px;
+    background: #ffffff;
+    border: 1px solid var(--line-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    max-height: 200px;
+    overflow-y: auto;
+}
+.crm-presale-product-customer-multi-dropdown .search-input {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--line-color);
+    padding: 8px 10px;
+    font-size: 12px;
+    outline: none;
+    box-sizing: border-box;
+}
+.crm-presale-product-customer-multi-dropdown .option-list {
+    display: flex;
+    flex-direction: column;
+}
+.crm-presale-product-customer-multi-dropdown .option-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    font-size: 12px;
+    color: #374151;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    width: 100%;
+}
+.crm-presale-product-customer-multi-dropdown .option-item:hover {
+    background: #f0f4fa;
+}
+.crm-presale-product-customer-multi-dropdown .option-item.is-checked {
+    background: var(--brand-blue-lighter);
+    color: var(--link-blue);
+}
+.crm-presale-product-customer-multi-dropdown .no-results {
+    padding: 12px;
+    font-size: 12px;
+    color: var(--muted-text);
+    text-align: center;
+}
+
+/* ========== Conversion Modal ========== */
+.crm-presale-product-conversion-warning {
+    padding: 12px 14px;
+    border-radius: var(--radius-md);
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    font-size: 12px;
+    color: #92400e;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.crm-presale-product-conversion-info {
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--brand-blue-lighter);
+    border: 1px solid #bfd4ff;
+    font-size: 12px;
+    color: var(--link-blue);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+/* ========== Success Toast ========== */
+.crm-presale-product-toast {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    z-index: 70;
+    padding: 12px 20px;
+    border-radius: var(--radius-md);
+    background: var(--done-bg);
+    border: 1px solid #a7f3d0;
+    color: var(--done-text);
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: presale-toast-enter 0.3s ease;
+}
+@keyframes presale-toast-enter {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========== Inline Presale Link (for customer detail integration) ========== */
+.crm-presale-product-inline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 360px;
+    overflow-y: auto;
+}
+.crm-presale-product-inline-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line-color);
+    background: #ffffff;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+.crm-presale-product-inline-item:hover {
+    border-color: #bfd4ff;
+    background: #f9fafb;
+}
+.crm-presale-product-inline-item.is-linked {
+    border-color: var(--link-blue);
+    background: var(--brand-blue-lighter);
+}
+.crm-presale-product-inline-item .item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.crm-presale-product-inline-item .item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #111827;
+}
+.crm-presale-product-inline-item .item-meta {
+    font-size: 11px;
+    color: var(--muted-text);
+}
+
+/* ========== Presale entry button (customer detail) ========== */
+.crm-customer-detail-presale-entry {
+    padding: 0;
+    margin-top: 2px;
+}
+.crm-customer-detail-presale-entry-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: var(--radius-lg);
+    border: 1px solid #e1eaf8;
+    background: linear-gradient(135deg, #fef9f0 0%, #fdf3e0 100%);
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
+}
+.crm-customer-detail-presale-entry-button:hover {
+    border-color: #fcd34d;
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+.crm-customer-detail-presale-entry-button div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.crm-customer-detail-presale-entry-button strong {
+    font-size: 13px;
+    color: #111827;
+    font-weight: 600;
+}
+.crm-customer-detail-presale-entry-button span {
+    font-size: 11px;
+    color: #92400e;
+}
+
+/* ========== Section divider ========== */
+.crm-presale-product-section-divider {
+    border: 0;
+    border-top: 1px solid var(--line-color);
+    margin: 0;
+}
+
+/* ========== Confirm Modal (for discard) ========== */
+.crm-presale-product-confirm-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    padding: 8px 0;
+}
+.crm-presale-product-confirm-body p {
+    font-size: 13px;
+    color: #6b7280;
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* ========== Rebuilt proofing page additions ========== */
+.crm-presale-product-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.crm-presale-product-summary-card {
+    border-radius: 14px;
+    padding: 14px 16px;
+    border: 1px solid #dbe4f0;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.crm-presale-product-summary-card .summary-label {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.crm-presale-product-summary-card .summary-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.crm-presale-product-summary-card.is-blue {
+    background: linear-gradient(135deg, #f8fbff 0%, #eef5ff 100%);
+}
+
+.crm-presale-product-summary-card.is-orange {
+    background: linear-gradient(135deg, #fffaf3 0%, #fff3de 100%);
+}
+
+.crm-presale-product-summary-card.is-gold {
+    background: linear-gradient(135deg, #fffdf3 0%, #fff8d8 100%);
+}
+
+.crm-presale-product-summary-card.is-green {
+    background: linear-gradient(135deg, #f4fff9 0%, #e8fff2 100%);
+}
+
+.crm-presale-product-header-copy {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.crm-presale-product-inline-hint {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.crm-presale-product-id-stack {
+    display: flex;
+    align-items: center;
+}
+
+.crm-presale-product-id-stack strong {
+    font-size: 12px;
+    color: #111827;
+}
+
+.crm-presale-product-type-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid #dbe4f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.crm-presale-product-type-tag.is-customer {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #2563eb;
+}
+
+.crm-presale-product-table-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 11px;
+}
+
+.crm-presale-product-description-cell {
+    max-width: 280px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.crm-presale-product-status-badge.is-style-review {
+    background: #fff7ed;
+    color: #c2410c;
+}
+
+.crm-presale-product-status-badge.is-color-review {
+    background: #f5f3ff;
+    color: #6d28d9;
+}
+
+.crm-presale-product-status-badge.is-pending-receive {
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.crm-presale-product-status-badge.is-received {
+    background: #ecfeff;
+    color: #0f766e;
+}
+
+.crm-presale-product-drawer-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--line-color);
+}
+
+.crm-presale-product-drawer-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.crm-presale-product-drawer-title-row h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #111827;
+}
+
+.crm-presale-product-drawer-copy {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: #6b7280;
+    line-height: 1.6;
+}
+
+.crm-presale-product-drawer-meta-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.crm-presale-product-drawer-meta-break {
+    flex-basis: 100%;
+    height: 0;
+}
+
+.crm-presale-product-drawer-meta-card {
+    min-width: 180px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.crm-presale-product-drawer-meta-card span {
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.crm-presale-product-drawer-meta-card strong {
+    font-size: 13px;
+    color: #111827;
+}
+
+.crm-presale-product-drawer-meta-card small {
+    font-size: 10px;
+    color: #94a3b8;
+}
+
+.crm-presale-product-drawer-meta-card.is-gallery {
+    min-width: 220px;
+}
+
+.crm-presale-product-drawer-basic-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: #6b7280;
+    flex-wrap: wrap;
+}
+
+.crm-presale-product-drawer-basic-meta .basic-meta-sep {
+    color: #d1d5db;
+    font-weight: 300;
+}
+
+.crm-presale-product-drawer-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid #f1f5f9;
+    background: #fafbfc;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.meta-inline-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #374151;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.meta-inline-items {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: #374151;
+    min-width: 0;
+}
+
+.meta-inline-items > span {
+    white-space: nowrap;
+}
+
+.meta-inline-sep {
+    color: #d1d5db;
+    font-weight: 300;
+    user-select: none;
+}
+
+.meta-inline-gallery {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.crm-presale-product-drawer-meta-gallery {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.crm-presale-product-drawer-meta-gallery-thumb {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid #dbe4f0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #ffffff;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.crm-presale-product-drawer-meta-gallery-thumb:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 14px rgba(37, 99, 235, 0.14);
+}
+
+.crm-presale-product-drawer-meta-gallery-thumb img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+.crm-presale-product-drawer-body {
+    padding: 20px 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+}
+
+.crm-presale-product-drawer-footer-bar {
+    padding: 14px 24px 18px;
+    border-top: 1px solid #e5e7eb;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.crm-presale-product-drawer-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 16px;
+}
+
+.crm-presale-product-drawer-panel {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #ffffff;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.crm-presale-product-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.crm-presale-product-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.crm-presale-product-detail-grid .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.crm-presale-product-detail-grid .detail-item span {
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.crm-presale-product-detail-grid .detail-item strong {
+    font-size: 13px;
+    color: #111827;
+    word-break: break-word;
+}
+
+.crm-presale-product-detail-grid .detail-item small {
+    font-size: 10px;
+    color: #94a3b8;
+}
+
+.crm-presale-product-note-card {
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    padding: 12px 14px;
+}
+
+.crm-presale-product-note-card strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: #111827;
+}
+
+.crm-presale-product-note-card p {
+    margin: 0;
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.7;
+}
+
+.crm-presale-product-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.crm-presale-product-timeline-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.crm-presale-product-timeline-item .timeline-dot {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #9ca3af;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.crm-presale-product-timeline-item .timeline-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-top: 2px;
+}
+
+.crm-presale-product-timeline-item .timeline-copy strong {
+    font-size: 12px;
+    color: #111827;
+}
+
+.crm-presale-product-timeline-item .timeline-copy span {
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.crm-presale-product-timeline-action-btn {
+    margin-top: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: fit-content;
+}
+
+.crm-presale-product-timeline-item.is-completed .timeline-dot,
+.crm-presale-product-timeline-item.is-current .timeline-dot {
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.crm-presale-product-timeline-item.is-discarded .timeline-dot {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.crm-presale-product-timeline-detail-card {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.crm-presale-product-timeline-detail-card.is-image {
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
+    padding: 8px;
+}
+
+.crm-presale-product-timeline-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.crm-presale-product-timeline-detail-grid .timeline-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.crm-presale-product-timeline-detail-grid .timeline-detail-item span {
+    font-size: 10px;
+    color: #6b7280;
+}
+
+.crm-presale-product-timeline-detail-grid .timeline-detail-item strong {
+    font-size: 12px;
+    color: #111827;
+    word-break: break-word;
+}
+
+.timeline-detail-image-card {
+    display: flex;
+    flex-direction: column;
+    width: 64px;
+}
+
+.timeline-detail-image-button {
+    padding: 0;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    overflow: hidden;
+    cursor: zoom-in;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.timeline-detail-image-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 14px rgba(37, 99, 235, 0.14);
+}
+
+.timeline-detail-image-button img,
+.timeline-detail-image-card .image-empty {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.timeline-detail-image-button img {
+    display: block;
+    object-fit: cover;
+}
+
+.timeline-detail-image-card .image-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 11px;
+}
+
+.crm-presale-product-image-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.crm-presale-product-image-grid .image-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.crm-presale-product-image-grid .image-card span {
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.crm-presale-product-image-grid .image-card img,
+.crm-presale-product-gallery-item img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.crm-presale-product-image-grid .image-empty {
+    min-height: 120px;
+    border-radius: 12px;
+    border: 1px dashed #d1d5db;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.crm-presale-product-drawer-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.crm-presale-product-upload-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.crm-presale-product-upload-label {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.crm-presale-product-upload-panel {
+    width: 100%;
+    min-height: 180px;
+    border-radius: 16px;
+    border: 1px dashed #cbd5e1;
+    background: #f8fafc;
+    cursor: pointer;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.crm-presale-product-upload-panel:hover {
+    border-color: #93c5fd;
+    background: #f3f8ff;
+}
+
+.crm-presale-product-upload-preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.crm-presale-product-upload-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.crm-presale-product-upload-input {
+    display: none;
+}
+
+.crm-presale-product-gallery-upload {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px dashed #cbd5e1;
+    background: #f8fafc;
+    cursor: pointer;
+    color: #475569;
+    font-size: 12px;
+}
+
+.crm-presale-product-gallery-upload:hover {
+    border-color: #93c5fd;
+    color: #2563eb;
+}
+
+.crm-presale-product-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.crm-presale-product-gallery-item {
+    position: relative;
+}
+
+.crm-presale-product-gallery-item.is-static::after {
+    display: none;
+}
+
+.crm-presale-product-gallery-remove {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 0;
+    background: rgba(15, 23, 42, 0.65);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.crm-presale-product-highlight-card {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f8fbff 0%, #eef5ff 100%);
+    border: 1px solid #dbeafe;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.crm-presale-product-highlight-card strong {
+    font-size: 13px;
+    color: #111827;
+}
+
+.crm-presale-product-highlight-card span {
+    font-size: 12px;
+    color: #4b5563;
+}
+
+@media (max-width: 1080px) {
+    .crm-presale-product-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .crm-presale-product-drawer-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .crm-presale-product-gallery-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .crm-presale-product-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .crm-presale-product-timeline-detail-card.is-image,
+    .crm-presale-product-detail-grid,
+    .crm-presale-product-image-grid,
+    .crm-presale-product-gallery-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .crm-presale-product-drawer-meta-card {
+        min-width: 0;
+    }
+
+    .crm-presale-product-timeline-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .crm-presale-product-page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+}
+
+.crm-presale-product-drawer-header-thumb {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.crm-presale-product-drawer-header-thumb:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 16px rgba(37, 99, 235, 0.14);
+}
+
+.crm-presale-product-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.7);
+    cursor: pointer;
+    animation: presale-mask-enter 0.2s ease;
+}
+
+.crm-presale-product-lightbox img {
+    max-width: 90vw;
+    max-height: 90vh;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    animation: presale-modal-enter 0.25s ease;
+}
